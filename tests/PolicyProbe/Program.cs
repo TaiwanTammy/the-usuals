@@ -1,0 +1,118 @@
+using SidebarPrototype;
+using System.Text.Json;
+
+var results = new List<object>();
+var failed = 0;
+void Check(string name, bool pass) { results.Add(new { name, pass }); if (!pass) failed++; }
+async Task Exercise(string name, Func<Task> action) {
+    try { await action(); Check(name, true); } catch (Exception e) { results.Add(new { name, pass = false, error = e.GetType().Name, message = e.Message }); failed++; }
+}
+var gmail = Launchers.All.Single(x => x.Id == "gmail-a");
+var calendar = Launchers.All.Single(x => x.Id == "calendar-a");
+var other = Launchers.All.Single(x => x.Id == "gmail-b");
+var soundcloud = Launchers.All.Single(x => x.Id == "soundcloud");
+var brand0 = AppBranding.Select(BrandingMode.Rotate, -1);
+var brand1 = AppBranding.Select(BrandingMode.Rotate, brand0.LastBrandIndex);
+var brand2 = AppBranding.Select(BrandingMode.Rotate, brand1.LastBrandIndex);
+Check("Brand rotates from default to The Usuals", brand0.Name == AppBranding.TheUsuals && brand0.LastBrandIndex == 0);
+Check("Brand rotates to Pane in the Apps", brand1.Name == AppBranding.PaneInTheApps && brand1.LastBrandIndex == 1);
+Check("Brand alternation repeats deterministically", brand2.Name == brand0.Name && brand2.LastBrandIndex == brand0.LastBrandIndex);
+Check("Pinned branding remains fixed without changing rotation history", AppBranding.Select(BrandingMode.PaneInTheApps, 0) is { Name: AppBranding.PaneInTheApps, LastBrandIndex: 0 });
+var invalidBranding = new AppSettings { BrandingMode = (BrandingMode)42, LastBrandIndex = 9 }.Validate();
+Check("Invalid branding settings sanitize to rotate defaults", invalidBranding.BrandingMode == BrandingMode.Rotate && invalidBranding.LastBrandIndex == -1);
+Check("Calendar Google marketing landing recognized",AppReturnPolicy.IsGoogleLanding(calendar,"https://workspace.google.com/products/calendar/"));
+Check("Google sign-in AccountChooser is recognized",AppReturnPolicy.IsGoogleSignInIntent(new Uri("https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fcalendar.google.com")));
+Check("Google AccountChooser path boundary is strict",!AppReturnPolicy.IsGoogleSignInIntent(new Uri("https://accounts.google.com/AccountChooserEvil")));
+Check("Google sign-in intent requires exact HTTPS account host",!AppReturnPolicy.IsGoogleSignInIntent(new Uri("http://accounts.google.com/AccountChooser")) && !AppReturnPolicy.IsGoogleSignInIntent(new Uri("https://accounts.google.com.evil.test/AccountChooser")));
+Check("Signed-in Calendar return promotes only when waiting",AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com/calendar/u/0/r",true) && !AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com/calendar/u/0/r",false));
+Check("Other app cannot be promoted into Calendar",!AppReturnPolicy.IsAppReturn(calendar,"https://mail.google.com/mail/u/0/",true));
+Check("Auth callback is not mistaken for app document",!AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com/oauth/callback?code=x",true));
+Check("SoundCloud opener callback never promoted as Google app",!AppReturnPolicy.IsAppReturn(soundcloud,"https://soundcloud.com/",true));
+Check("Untrusted app-origin lookalike not promoted",!AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com.evil.test/",true));
+var normalFlow = new NavigationSession(gmail);
+Check("Normal app document embeds", normalFlow.Decide(gmail.StartUri.AbsoluteUri,1,false,true)==NavigationDecision.Embed);
+Check("Unrelated explicit user navigation opens externally",normalFlow.Decide("https://example.org/article",2,false,true)==NavigationDecision.External);
+Check("Unknown secure server redirect keeps accepted navigation lineage",normalFlow.Decide("https://accounts.youtube.com/accounts/SetSID",1,true,true)==NavigationDecision.Embed);
+Check("Authentication POST/callback stays in same browser context",normalFlow.Decide("https://identity.example.test/submit",3,false,true)==NavigationDecision.Embed);
+normalFlow.Complete(gmail.StartUri.AbsoluteUri,true);
+Check("Return to app ends main authentication context",!normalFlow.AuthenticationActive);
+Check("Explicit unrelated links external after auth completes",normalFlow.Decide("https://example.org/article",4,false,true)==NavigationDecision.External);
+Check("Unrelated script navigation external after auth completes",normalFlow.Decide("https://example.org/script",5,false,false)==NavigationDecision.External);
+Check("Main app host HTTP downgrade blocked",normalFlow.Decide("http://mail.google.com/",6,false,true)==NavigationDecision.Block);
+var wrongLineage = new NavigationSession(gmail); wrongLineage.Decide(gmail.StartUri.AbsoluteUri,1,false,true);
+Check("Unaccepted redirect navigation does not inherit another lineage",wrongLineage.Decide("https://example.org/redirect",999,true,true)==NavigationDecision.Block);
+var authWindow = new NavigationSession(soundcloud,true);
+Check("Owned auth window accepts blank bootstrap",authWindow.Decide("about:blank",1,false,false)==NavigationDecision.Embed);
+Check("Owned auth window keeps arbitrary HTTPS identity-provider hop",authWindow.Decide("https://identity.example.test/consent",2,true,true)==NavigationDecision.Embed);
+Check("Owned auth window keeps callback POST",authWindow.Decide("https://secure.soundcloud.com/callback",3,false,true)==NavigationDecision.Embed);
+Check("Owned auth window blocks insecure downgrade",authWindow.Decide("http://example.org/callback",3,true,true)==NavigationDecision.Block);
+Check("Owned auth window blocks executable scheme",authWindow.Decide("javascript:alert(1)",4,false,true)==NavigationDecision.Block);
+Check("Gmail and Calendar share account A storage identity", gmail.Profile == calendar.Profile);
+Check("Account B has isolated storage identity", gmail.Profile != other.Profile);
+Check("Same-app Gmail URL stays embedded", UrlPolicy.ShouldEmbed(new Uri("https://mail.google.com/mail/u/0/"), gmail));
+Check("Workspace Gmail landing stays embedded for account A", UrlPolicy.ShouldEmbed(new Uri("https://workspace.google.com/intl/en-US/gmail/"), gmail));
+Check("Workspace Gmail landing stays embedded for account B", UrlPolicy.ShouldEmbed(new Uri("https://workspace.google.com/gmail/"), other));
+Check("Workspace Calendar page stays external from Gmail", !UrlPolicy.ShouldEmbed(new Uri("https://workspace.google.com/intl/en-US/calendar/"), gmail));
+Check("Workspace Gmail page stays external from Calendar", !UrlPolicy.ShouldEmbed(new Uri("https://workspace.google.com/gmail/"), calendar));
+Check("Workspace lookalike domain cannot embed", !UrlPolicy.ShouldEmbed(new Uri("https://workspace.google.com.evil.example/gmail/"), gmail));
+Check("Google SetOSID account completion stays embedded", UrlPolicy.ShouldEmbed(new Uri("https://www.google.com/accounts/SetOSID?ssdc=1"), gmail));
+Check("Unrelated Google page stays external", !UrlPolicy.ShouldEmbed(new Uri("https://www.google.com/search?q=mail"), gmail));
+Check("Calendar link in Gmail opens externally", !UrlPolicy.ShouldEmbed(new Uri("https://calendar.google.com/calendar/u/0/r"), gmail));
+Check("Gmail link in Calendar opens externally", !UrlPolicy.ShouldEmbed(new Uri("https://mail.google.com/mail/u/0/"), calendar));
+Check("Confusable suffix domain cannot embed", !UrlPolicy.ShouldEmbed(new Uri("https://mail.google.com.evil.example/"), gmail));
+Check("Empty popup bootstrap is recognized", UrlPolicy.IsPopupBootstrap(null) && UrlPolicy.IsPopupBootstrap("") && UrlPolicy.IsPopupBootstrap("  "));
+Check("about:blank popup bootstrap is recognized", UrlPolicy.IsPopupBootstrap("about:blank") && UrlPolicy.ShouldEmbedPopup(new Uri("about:blank"), soundcloud));
+Check("SoundCloud Google auth popup stays in its profile", UrlPolicy.ShouldEmbedPopup(new Uri("https://accounts.google.com/o/oauth2/v2/auth"), soundcloud));
+Check("SoundCloud Google SetOSID popup stays in its profile", UrlPolicy.ShouldEmbedPopup(new Uri("https://www.google.com/accounts/SetOSID?ssdc=1"), soundcloud));
+Check("Official SoundCloud secure auth host stays embedded", UrlPolicy.ShouldEmbed(new Uri("https://secure.soundcloud.com/sign-in"), soundcloud));
+Check("Official SoundCloud secure auth host stays embedded in popup", UrlPolicy.ShouldEmbedPopup(new Uri("https://secure.soundcloud.com/sign-in"), soundcloud));
+Check("SoundCloud secure auth host is not internal to Gmail", !UrlPolicy.ShouldEmbed(new Uri("https://secure.soundcloud.com/sign-in"), gmail));
+Check("SoundCloud secure auth host lookalike is denied", !UrlPolicy.ShouldEmbed(new Uri("https://secure.soundcloud.com.evil.example/sign-in"), soundcloud));
+Check("HTTP SoundCloud secure auth URL is denied", !UrlPolicy.ShouldEmbedPopup(new Uri("http://secure.soundcloud.com/sign-in"), soundcloud));
+Check("SoundCloud Google lookalike popup is denied", !UrlPolicy.ShouldEmbedPopup(new Uri("https://accounts.google.com.evil.example/o/oauth2/auth"), soundcloud));
+Check("SoundCloud unrelated Google popup is denied", !UrlPolicy.ShouldEmbedPopup(new Uri("https://www.google.com/search?q=mail"), soundcloud));
+Check("Cross-app Calendar popup is denied", !UrlPolicy.ShouldEmbedPopup(new Uri("https://calendar.google.com/calendar/u/0/r"), gmail));
+Check("Unrelated popup opens externally", !UrlPolicy.ShouldEmbedPopup(new Uri("https://example.org/"), soundcloud));
+Check("HTTP auth popup is denied", !UrlPolicy.ShouldEmbedPopup(new Uri("http://accounts.google.com/o/oauth2/auth"), soundcloud));
+Check("Unsupported popup scheme is denied", !UrlPolicy.ShouldEmbedPopup(new Uri("javascript:alert(1)"), soundcloud));
+Check("Credential-bearing URI rejected", !UrlPolicy.TryParseHttp("https://u:p@mail.google.com/", out _));
+Check("Executable scheme rejected", !UrlPolicy.TryParseHttp("file:///C:/Windows/notepad.exe", out _));
+Check("Token fragment not restored", !UrlPolicy.IsAllowedRestore("https://mail.google.com/#access_token=secret", gmail));
+Check("Auth code not restored", !UrlPolicy.IsAllowedRestore("https://mail.google.com/?code=one-time", gmail));
+Check("Encoded auth code key not restored", !UrlPolicy.IsAllowedRestore("https://mail.google.com/?%63ode=one-time", gmail));
+Check("Encoded token fragment not restored", !UrlPolicy.IsAllowedRestore("https://mail.google.com/#%61ccess_token=secret", gmail));
+Check("Other app last URL not restored into Gmail", !UrlPolicy.IsAllowedRestore("https://calendar.google.com/calendar/u/0/r", gmail));
+Check("External last URL not restored", !UrlPolicy.IsAllowedRestore("https://example.org/", gmail));
+var state = new ViewState();
+var a = state.BeginSwitch("gmail-a"); var b = state.BeginSwitch("calendar-a");
+Check("Late first activation suppressed", !state.CanPresent("gmail-a", a) && state.CanPresent("calendar-a", b));
+state.Hide(); Check("Late completion after close suppressed", !state.CanPresent("calendar-a", b));
+foreach (var width in new[] { 320d, 640d, 800d, 1440d, 2560d }) {
+    var sized = PanelSizing.Clamp(double.NaN, width, 128);
+    Check($"Sizing remains finite and on-screen at {width}", double.IsFinite(sized) && sized > 0 && sized <= width - 128);
+}
+Check("Default width remains unset until display is known", new AppSettings { Launchers = new() { [gmail.Id] = new() } }.Validate().Launchers[gmail.Id].Width == 0);
+var root = args.Length > 0 ? Path.GetFullPath(args[0]) : Path.Combine(Path.GetTempPath(), "sidebar-policy-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(root);
+await Exercise("Configuration roundtrip preserves user choices", async () => {
+    var file = Path.Combine(root, "roundtrip.json");
+    var cfg = new AppSettings { DockWidth = 144, Topmost = false, Launchers = new() { [gmail.Id] = new() { Mode = PanelMode.Split, Width = 450, Zoom = 1.3, Theme = SiteTheme.Light } } };
+    await cfg.SaveAtomicAsync(file);
+    var read = AppSettings.SafeLoad(file);
+    if (read.DockWidth != 144 || read.Topmost || read.Launchers[gmail.Id].Mode != PanelMode.Split || read.Launchers[gmail.Id].Zoom != 1.3) throw new Exception("Roundtrip mismatch");
+});
+await Exercise("Concurrent atomic saves leave a parseable complete document", async () => {
+    var file = Path.Combine(root, "concurrent.json"); var cfg = new AppSettings();
+    await Task.WhenAll(Enumerable.Range(0, 32).Select(_ => cfg.SaveAtomicAsync(file)));
+    using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(file));
+    if (!doc.RootElement.TryGetProperty("DockWidth", out _)) throw new Exception("Incomplete document");
+});
+await Exercise("Malformed settings backed up and safe defaults returned", async () => {
+    var file = Path.Combine(root, "broken.json"); await File.WriteAllTextAsync(file, "{ broken");
+    var cfg = AppSettings.SafeLoad(file);
+    if (cfg.DockWidth != 45 || !File.Exists(file + ".corrupt.bak")) throw new Exception("Backup/default failure");
+});
+var report = JsonSerializer.Serialize(new { passed = results.Count - failed, failed, results }, new JsonSerializerOptions { WriteIndented = true });
+await File.WriteAllTextAsync(Path.Combine(root, "policy-results.json"), report);
+Console.WriteLine(report);
+return failed == 0 ? 0 : 1;

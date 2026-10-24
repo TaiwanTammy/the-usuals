@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup><Compile Include="../../src/SidebarPrototype/Core.cs" Link="Core.cs" /><Compile Include="../../src/SidebarPrototype/AppBranding.cs" Link="AppBranding.cs" /><Compile Include="../../src/SidebarPrototype/NavigationSession.cs" Link="NavigationSession.cs" /><Compile Include="../../src/SidebarPrototype/AppReturnPolicy.cs" Link="AppReturnPolicy.cs" /></ItemGroup>
+</Project>

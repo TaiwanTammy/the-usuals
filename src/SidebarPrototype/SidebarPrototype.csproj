@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><LangVersion>preview</LangVersion>
+    <AssemblyName>SidebarPrototype</AssemblyName><RootNamespace>SidebarPrototype</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" /></ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\gmail-gray-128.png" />
+    <Resource Include="Assets\calendar-gray-128.png" />
+    <Resource Include="Assets\soundcloud-gray-128.png" />
+    <Resource Include="Assets\gmail-color-128.png" />
+    <Resource Include="Assets\calendar-color-128.png" />
+    <Resource Include="Assets\soundcloud-color-128.png" />
+  </ItemGroup>
+</Project>
