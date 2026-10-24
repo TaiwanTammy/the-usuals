@@ -20,10 +20,10 @@ Requires Windows, the .NET 10 SDK (`winget install Microsoft.DotNet.SDK.10`) and
 
 ```powershell
 .\scripts\Build.ps1 -Publish
-.\scripts\Test.ps1 -Mode All -NoBuild
+.\scripts\Test.ps1 -Mode All
 ```
 
-`Build.ps1 -Publish` writes the app to `build\publish`. Copy it into `app\` after quitting the running copy, then launch it with `Start.cmd`. Test modes are `Quick`, `Ui`, `Unload`, `Native` and `All`. Tests use throwaway profiles under `build\test-runs`, never real logins. Native tests briefly reserve desktop space and restore it.
+`Build.ps1 -Publish` writes the app to `build\publish`. Copy it into `app\` after quitting the running copy, then launch it with `Start.cmd`. Test modes are `Quick`, `Ui`, `Unload`, `Native` and `All`. `Test.ps1` builds its own `TestHarness` copy with the test code included; the published app contains none of it. Tests use throwaway profiles under `build\test-runs`, never real logins. Native tests briefly reserve desktop space and restore it.
 
 ## Not done yet
 

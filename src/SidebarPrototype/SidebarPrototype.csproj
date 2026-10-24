@@ -4,7 +4,17 @@
     <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><LangVersion>preview</LangVersion>
     <AssemblyName>SidebarPrototype</AssemblyName><RootNamespace>SidebarPrototype</RootNamespace>
+    <Configurations>Debug;Release;TestHarness</Configurations>
   </PropertyGroup>
+  <!-- TestHarness is an optimized build that also compiles Testing\ and its hidden command-line switches.
+       scripts\Test.ps1 builds it; Release (what Build.ps1 -Publish ships) contains none of it. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'TestHarness'">
+    <Optimize>true</Optimize>
+    <DefineConstants>$(DefineConstants);TEST_HARNESS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Configuration)' != 'TestHarness'">
+    <Compile Remove="Testing\**" />
+  </ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" /></ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\gmail-gray-128.png" />

@@ -14,7 +14,8 @@ Read this file and `README.md` before editing. This is an existing Windows deskt
 ## Technical map
 
 - .NET 10, C#, WPF plus a WinForms tray icon, Microsoft WebView2 `1.0.4314.35`. Builds use the system-wide .NET 10 SDK.
-- `Program.cs`: application startup, host lifecycle, WebView setup, placement, toolbar dispatch, zoom/identity and fixture runners.
+- `App.cs`: startup, single-instance mutex, startup-failure reporting. `HostWindowOptions.cs`: the one options object for `HostWindow` plus `LaunchOptions`; a release launch always uses the defaults.
+- `HostWindow.cs` (fields, constructor, hide/quit/dispose), `HostWindow.WebViews.cs` (view creation, activation, keyboard bridge, navigation diagnostics), `HostWindow.Placement.cs` (tool-window style, AppBar reservation, layout, resize commit), `HostWindow.Toolbar.cs` (toolbar dispatch, zoom, desktop/mobile identity). `ShortcutDialog.cs`: hotkey capture.
 - `DockUi.cs`: dock controls, shared button/menu templates, add/reorder UI, custom favicon/image handling.
 - `PanelWindow.cs`: compact toolbar, responsive overflow, retained page surfaces, native window hook and frame behavior.
 - `Core.cs`: persisted settings, launchers/catalog, URL rules, sizing and visible-state generations.
@@ -22,7 +23,7 @@ Read this file and `README.md` before editing. This is an existing Windows deskt
 - `BrowserIdentity.cs`: user agent/client hints/mobile metrics.
 - `AppBranding.cs` / `AppBrandingHost.cs`: pure name selection and six-hour display rotation. `BrandingMode` defaults to `Rotate`; `TheUsuals` and `PaneInTheApps` are fixed-name modes for the eventual decision. `LastBrandIndex` persists the sequence. There is no name-selection settings UI yet; do not imply one exists.
 - `Shell/`: Windows AppBar reservation, DPI, hotkey and focus behavior.
-- `UiRegression.cs`, `UnloadRegression.cs`: isolated integration checks, currently compiled into the app and run through hidden command-line switches. `tests/PolicyProbe` links pure source files directly; preserve the relative `src/` and `tests/` structure.
+- `Testing/`: the whole test harness (self-tests, switch parsing, fixture server and pages, smoke/layout/unload/UI/transition runners, native sampling, `RuntimeProbe`). It compiles only in the `TestHarness` configuration (`TEST_HARNESS` constant), which `scripts/Test.ps1` builds; the Release exe has none of it and ignores every command-line switch. Production call sites into it are wrapped in `#if TEST_HARNESS`; option checks such as `_options.Fixture` stay in production code and are always false there. `tests/PolicyProbe` links pure source files directly; preserve the relative `src/` and `tests/` structure.
 
 ## Invariants learned through real failures
 

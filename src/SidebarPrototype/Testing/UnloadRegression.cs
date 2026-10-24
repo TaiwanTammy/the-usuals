@@ -13,7 +13,7 @@ internal sealed partial class HostWindow
 
     private async Task RunUnloadRegressionChecksAsync(Dictionary<string, object?> results)
     {
-        if (!_fixture || _fixtureBase is null) throw new InvalidOperationException("Unload regressions require the local browser fixture.");
+        if (!_options.Fixture || _fixtureBase is null) throw new InvalidOperationException("Unload regressions require the local browser fixture.");
         var failures = new List<string>();
         void Check(string key, bool passed, object? detail = null)
         {

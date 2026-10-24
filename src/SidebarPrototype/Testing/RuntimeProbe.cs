@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 
-namespace SidebarPrototype.Verification;
+namespace SidebarPrototype;
 
 public sealed record WorkAreaSnapshot(int Left, int Top, int Right, int Bottom)
 {

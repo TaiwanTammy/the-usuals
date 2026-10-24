@@ -9,7 +9,6 @@ using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using SidebarPrototype.Shell;
-using SidebarPrototype.Verification;
 using System.Windows.Threading;
 using System.Windows.Shell;
 using System.Windows.Media;
@@ -24,7 +23,7 @@ using Point = System.Windows.Point;
 
 namespace SidebarPrototype;
 
-internal sealed class PanelWindow : Window
+internal sealed partial class PanelWindow : Window
 {
     private readonly HostWindow _host; private readonly DockPanel _root = new(); private readonly Grid _content = new(); private readonly Dictionary<WebView2, UIElement> _viewBoxes = []; private readonly List<AuthSurface> _popups = []; private UIElement? _failure; private readonly TextBlock _error = new() { Foreground = System.Windows.Media.Brushes.White, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _status = new() { Foreground = System.Windows.Media.Brushes.LightGray, FontSize = 12, Padding = new Thickness(8,3,8,3), Background = System.Windows.Media.Brushes.Black };
@@ -44,9 +43,6 @@ internal sealed class PanelWindow : Window
     private bool _userCloseRequested;
     private bool _nativeHookInstalled;
     public int CloseAttemptCount { get; private set; }
-    public int WindowPositionMessages { get; private set; }
-    public int WindowMoveMessages { get; private set; }
-    public int WindowSizeMessages { get; private set; }
     public event EventHandler? UserResizeCompleted;
     public PanelWindow(HostWindow host)
     {
@@ -110,24 +106,6 @@ internal sealed class PanelWindow : Window
         if(_themeButton is not null) { var dark=(_activeSetting?.Theme ?? SiteTheme.Dark)==SiteTheme.Dark; _themeButton.ToolTip=dark ? "Light mode" : "Dark mode"; _themeButton.Content=ToolbarIcon(dark ? "M12 3 A9 9 0 1 0 12 21 A4.5 9 0 0 1 12 3 Z" : "M12 3 V5 M12 19 V21 M3 12 H5 M19 12 H21 M5.6 5.6 L7 7 M17 17 L18.4 18.4 M18.4 5.6 L17 7 M7 17 L5.6 18.4 M12 8 A4 4 0 1 0 12 16 A4 4 0 1 0 12 8"); }
         RebuildOverflow();
     }
-    internal object CaptureToolbar(string path,double width) {
-        var original=Width; Width=width;
-        if(_toolbar is null) throw new InvalidOperationException("Toolbar is unavailable");
-        UpdateLayout(); _toolbar.UpdateLayout(); UpdateCompactToolbar(); UpdateLayout(); _toolbar.UpdateLayout();
-        var height=_toolbar.ActualHeight; var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(_toolbar.ActualWidth)),Math.Max(1,(int)Math.Ceiling(height)),96,96,System.Windows.Media.PixelFormats.Pbgra32); bitmap.Render(_toolbar);
-        var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using(var stream=File.Create(path)) encoder.Save(stream);
-        var commands=_toolbarButtons.Where(p=>p.Value.Visibility==Visibility.Visible).Select(p=>p.Key).ToArray();
-        var overflowCommands=_overflowMenu?.Items.OfType<MenuItem>().Select(i=>i.Tag?.ToString() ?? "").Where(s=>s.Length>0).ToArray() ?? [];
-        var noDuplicates=!commands.Intersect(overflowCommands,StringComparer.Ordinal).Any();
-        var noOverflow=_toolbarButtons.Values.Where(b=>b.Visibility==Visibility.Visible).All(b=> {
-            var origin=b.TransformToAncestor(_toolbar).Transform(new Point(0,0));
-            var end=b.TransformToAncestor(_toolbar).Transform(new Point(b.ActualWidth,b.ActualHeight));
-            return origin.X>=-0.5 && origin.Y>=-0.5 && end.X<=_toolbar.ActualWidth+0.5 && end.Y<=_toolbar.ActualHeight+0.5;
-        });
-        var visibleControls=new[]{_modeButton,_browserButton,_deviceButton,_topmostButton,_zoomOutButton,_zoomInButton,_themeButton,_moreButton,_closeButton}.All(x=>x is { Visibility:Visibility.Visible } && x.ActualWidth>0 && x.ActualHeight>0);
-        var result=new { toolbarWidth=_toolbar.ActualWidth,toolbarHeight=height,visibleControls,commands,overflowcommands=overflowCommands,noDuplicates,noOverflow,compact=_toolbar.ActualWidth<=360 };
-        Width=original; UpdateLayout(); UpdateCompactToolbar(); return result;
-    }
     internal object CaptureOverflow(string path,double width) { var original=Width; Width=width; UpdateLayout(); UpdateCompactToolbar(); UpdateLayout(); _toolbar?.UpdateLayout(); _overflowMenu!.IsOpen=true; _overflowMenu.UpdateLayout(); Visual? popupContent=VisualTreeHelper.GetChildrenCount(_overflowMenu)>0 ? VisualTreeHelper.GetChild(_overflowMenu,0) as Visual : null; if(popupContent is System.Windows.Controls.Primitives.Popup popup) popupContent=popup.Child as Visual; popupContent ??= _overflowMenu; var bounds=VisualTreeHelper.GetDescendantBounds(popupContent); var size=bounds.IsEmpty ? ((FrameworkElement)popupContent).RenderSize : bounds.Size; var bmp=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(size.Width)),Math.Max(1,(int)Math.Ceiling(size.Height)),96,96,PixelFormats.Pbgra32); bmp.Render(popupContent); var enc=new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(bmp)); using(var s=File.Create(path)) enc.Save(s); var result=new { width=size.Width,height=size.Height,commands=_overflowMenu.Items.OfType<MenuItem>().Select(i=>i.Tag?.ToString() ?? "").ToArray() }; _overflowMenu.IsOpen=false; Width=original; UpdateLayout(); UpdateCompactToolbar(); return result; }
     internal object CapturePanel(string path,double width) { var original=Width; Width=width; UpdateLayout(); var size=_root.RenderSize; var bmp=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(size.Width)),Math.Max(1,(int)Math.Ceiling(size.Height)),96,96,PixelFormats.Pbgra32); bmp.Render(_root); var enc=new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(bmp)); using(var s=File.Create(path)) enc.Save(s); Width=original; UpdateLayout(); return new { width=size.Width,height=size.Height,windowStyle=WindowStyle.ToString(),resizeMode=ResizeMode.ToString(),resizeBorder=WindowChrome.GetWindowChrome(this)?.ResizeBorderThickness.ToString() }; }
     private static UIElement ToolbarIcon(string data) => new System.Windows.Shapes.Path { Data=Geometry.Parse(data),Stroke=Brushes.LightGray,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Fill=Brushes.Transparent,Width=14,Height=14,Stretch=Stretch.Uniform };
@@ -159,7 +137,11 @@ internal sealed class PanelWindow : Window
     }
     public void OfferExternalLink(Uri uri,Action action) { _outsideAction=action; _outsideLink.Content=$"Open {uri.IdnHost} in browser"; _outsideLink.Visibility=Visibility.Visible; SetStatus("An outside link was requested. It has not opened automatically."); }
     public void PromotePopup(AuthSurface surface,WebView2 view) { _popups.Remove(surface); surface.MarkPromoted(); _viewBoxes[view]=surface; if(_activeLauncher==surface.LauncherId) _activeView=view; RefreshVisibility(); }
-    private nint WindowProc(nint hwnd,int message,nint wParam,nint lParam,ref bool handled) { if(_host.TransitionTest) { if(message==0x0046) _host.RecordNativeBounds("panel",hwnd,message,lParam); else if(message==0x0047) { WindowPositionMessages++; _host.RecordNativeBounds("panel",hwnd,message); } else if(message==0x0003) { WindowMoveMessages++; _host.RecordNativeBounds("panel",hwnd,message); } else if(message==0x0005) { WindowSizeMessages++; _host.RecordNativeBounds("panel",hwnd,message); } } if(message==0x0112 && (wParam.ToInt64() & 0xfff0)==0xf060) _userCloseRequested=true; if(message==0x0232) UserResizeCompleted?.Invoke(this,EventArgs.Empty); return 0; }
+    private nint WindowProc(nint hwnd,int message,nint wParam,nint lParam,ref bool handled) {
+#if TEST_HARNESS
+        if(_host.TransitionTest) RecordTransitionMessage(hwnd,message,lParam);
+#endif
+        if(message==0x0112 && (wParam.ToInt64() & 0xfff0)==0xf060) _userCloseRequested=true; if(message==0x0232) UserResizeCompleted?.Invoke(this,EventArgs.Empty); return 0; }
     public void ApplyLayout(DockLayout l, double width) { Left = l.PanelBounds.Left; Top = l.PanelBounds.Top; Width = Math.Min(width, l.PanelBounds.Width); Height = l.PanelBounds.Height; }
     public void ShowFailure(Launcher l, Action retry) { ClearFailure(); var stack = new StackPanel { Margin = new Thickness(20), Background = System.Windows.Media.Brushes.Black }; stack.Children.Add(new TextBlock { Text = $"Could not open {l.Label}", Foreground = System.Windows.Media.Brushes.White, FontSize = 18 }); stack.Children.Add(_error); var b = new WpfButton { Content = "Retry", Margin = new Thickness(0, 12, 0, 0) }; b.Click += (_, _) => retry(); stack.Children.Add(b); _failure = stack; _content.Children.Add(stack); }
     public void SetError(string text) => _error.Text = text;

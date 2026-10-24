@@ -9,17 +9,17 @@ internal sealed partial class HostWindow
 
     private void InitializeBranding()
     {
-        var selection = _fixture
+        var selection = _options.Fixture
             ? AppBranding.Select(BrandingMode.TheUsuals, -1)
             : AppBranding.Select(_settings.BrandingMode, _settings.LastBrandIndex);
         _brandName = selection.Name;
-        if (!_fixture && _settings.BrandingMode == BrandingMode.Rotate)
+        if (!_options.Fixture && _settings.BrandingMode == BrandingMode.Rotate)
         {
             _settings.LastBrandIndex = selection.LastBrandIndex;
             _ = SaveAsync();
         }
         UpdateBrandingDisplay();
-        if (_fixture) return;
+        if (_options.Fixture) return;
         _brandingTimer.Tick += (_, _) => RotateBranding();
         _brandingTimer.Start();
     }

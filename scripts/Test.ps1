@@ -1,6 +1,6 @@
 param([ValidateSet('Quick','Ui','Unload','Native','All')][string]$Mode='Quick',[switch]$NoBuild)
 . (Join-Path $PSScriptRoot 'Environment.ps1')
-if (!$NoBuild) { & (Join-Path $PSScriptRoot 'Build.ps1'); if (!$?) { throw 'Build failed.' } }
+if (!$NoBuild) { & (Join-Path $PSScriptRoot 'Build.ps1') -TestHarness; if (!$?) { throw 'Build failed.' } }
 if (!(Test-Path -LiteralPath $projectAssembly)) { throw 'Build the project first.' }
 $resultsDirectory = Join-Path $projectRoot 'build\test-results'
 New-Item -ItemType Directory -Path $resultsDirectory -Force | Out-Null

@@ -50,7 +50,7 @@ internal sealed partial class HostWindow
     {
         var core=view.CoreWebView2; var setting=GetSetting(app.Id);
         var nativeAgent=core.Settings.UserAgent; _desktopAgents[app.Id]=nativeAgent;
-        var navigation=new NavigationSession(app,false,_fixture ? new Uri(_fixtureBase!) : null); _navigationSessions[app.Id]=navigation;
+        var navigation=new NavigationSession(app,false,_options.Fixture ? new Uri(_fixtureBase!) : null); _navigationSessions[app.Id]=navigation;
         core.Settings.AreDefaultScriptDialogsEnabled=true; core.Settings.AreDevToolsEnabled=false;
         core.PermissionRequested+=(_,e)=> { if(e.PermissionKind==CoreWebView2PermissionKind.Notifications) e.State=CoreWebView2PermissionState.Deny; };
         ConfigureExternalSchemes(core,()=>IsCurrent(app,view));
@@ -121,7 +121,9 @@ internal sealed partial class HostWindow
             if(!IsAppEpochCurrent(app.Id,epoch) || surface.IsClosed) { surface.Close(); return null; }
             await web.EnsureCoreWebView2Async(environment).WaitAsync(TimeSpan.FromSeconds(15));
             if(!IsAppEpochCurrent(app.Id,epoch) || surface.IsClosed) { surface.Close(); return null; }
-            if(_fixture && UnloadRegressionPopupControllerReadyHook is { } popupReady) await popupReady();
+#if TEST_HARNESS
+            if(_options.Fixture && UnloadRegressionPopupControllerReadyHook is { } popupReady) await popupReady();
+#endif
             if(!IsAppEpochCurrent(app.Id,epoch) || surface.IsClosed) { surface.Close(); return null; }
             var waiting=explicitGoogleAuthIntent || _navigationSessions.TryGetValue(app.Id,out var parent) && parent.AuthenticationActive;
             var parentSource=_views.TryGetValue(app.Id,out var main) ? main.CoreWebView2?.Source : null;
@@ -138,23 +140,28 @@ internal sealed partial class HostWindow
         var epoch=AppEpoch(app.Id);
         if(!IsAppEpochCurrent(app.Id,epoch)) return;
         var googleAuthIntent=UrlPolicy.TryParseHttp(e.Uri,out var initialTarget) && AppReturnPolicy.IsGoogleSignInIntent(initialTarget!) ||
-            _fixture && Uri.TryCreate(e.Uri,UriKind.Absolute,out var fixtureTarget) && fixtureTarget!.IsLoopback && fixtureTarget.Port==new Uri(_fixtureBase!).Port && fixtureTarget.AbsolutePath=="/google-auth-intent";
+            _options.Fixture && Uri.TryCreate(e.Uri,UriKind.Absolute,out var fixtureTarget) && fixtureTarget!.IsLoopback && fixtureTarget.Port==new Uri(_fixtureBase!).Port && fixtureTarget.AbsolutePath=="/google-auth-intent";
         if(!UrlPolicy.IsPopupBootstrap(e.Uri)) {
             if(!UrlPolicy.TryParseHttp(e.Uri,out var uri)) return;
             var auth=_navigationSessions.TryGetValue(app.Id,out var session) && session.AuthenticationActive;
-            if(!ownedContext && !auth && !UrlPolicy.ShouldEmbedPopup(uri!,app,_fixture ? new Uri(_fixtureBase!) : null)) { OpenExternal(uri!); return; }
-            if(uri!.Scheme!="https" && !(_fixture && uri.IsLoopback && uri.Port==new Uri(_fixtureBase!).Port)) return;
+            if(!ownedContext && !auth && !UrlPolicy.ShouldEmbedPopup(uri!,app,_options.Fixture ? new Uri(_fixtureBase!) : null)) { OpenExternal(uri!); return; }
+            if(uri!.Scheme!="https" && !(_options.Fixture && uri.IsLoopback && uri.Port==new Uri(_fixtureBase!).Port)) return;
         }
         var deferral=e.GetDeferral();
         try { var popup=await CreatePopupAsync(app,epoch,googleAuthIntent); if(popup is not null && IsAppEpochCurrent(app.Id,epoch)) e.NewWindow=popup; }
         catch(OperationCanceledException) when(!IsAppEpochCurrent(app.Id,epoch)) { }
         catch(ObjectDisposedException) when(!IsAppEpochCurrent(app.Id,epoch)) { }
         catch { if(IsAppEpochCurrent(app.Id,epoch) && _state.IsVisible && _state.ActiveId==app.Id) _panel.SetStatus("The sign-in view could not open. Please try again."); }
-        finally { deferral.Complete(); if(_fixture) UnloadRegressionPopupRequestFinished?.TrySetResult((e.Handled,e.NewWindow is not null)); }
+        finally {
+            deferral.Complete();
+#if TEST_HARNESS
+            if(_options.Fixture) UnloadRegressionPopupRequestFinished?.TrySetResult((e.Handled,e.NewWindow is not null));
+#endif
+        }
     }
     private void ConfigurePopup(Launcher app,WebView2 web,AuthSurface surface,bool waiting,long epoch)
     {
-        var core=web.CoreWebView2; var navigation=new NavigationSession(app,true,_fixture ? new Uri(_fixtureBase!) : null);
+        var core=web.CoreWebView2; var navigation=new NavigationSession(app,true,_options.Fixture ? new Uri(_fixtureBase!) : null);
         var waitingForSignIn=waiting;
         core.Settings.AreDefaultScriptDialogsEnabled=true; core.Settings.AreDevToolsEnabled=false;
         core.PermissionRequested+=(_,e)=> { if(e.PermissionKind==CoreWebView2PermissionKind.Notifications) e.State=CoreWebView2PermissionState.Deny; };
@@ -163,7 +170,7 @@ internal sealed partial class HostWindow
             if(surface.IsPromoted) return;
             if(!IsAppEpochCurrent(app.Id,epoch) || surface.IsClosed) { e.Cancel=true; return; }
             if(AppReturnPolicy.IsGoogle(app) && (UrlPolicy.TryParseHttp(e.Uri,out var intentUri) && AppReturnPolicy.IsGoogleSignInIntent(intentUri!) ||
-                _fixture && Uri.TryCreate(e.Uri,UriKind.Absolute,out var fixtureIntent) && fixtureIntent!.IsLoopback && fixtureIntent.Port==new Uri(_fixtureBase!).Port && fixtureIntent.AbsolutePath=="/google-auth-intent"))
+                _options.Fixture && Uri.TryCreate(e.Uri,UriKind.Absolute,out var fixtureIntent) && fixtureIntent!.IsLoopback && fixtureIntent.Port==new Uri(_fixtureBase!).Port && fixtureIntent.AbsolutePath=="/google-auth-intent"))
                 waitingForSignIn=true;
             var decision=navigation.Decide(e.Uri,e.NavigationId,e.IsRedirected,e.IsUserInitiated); e.Cancel=decision!=NavigationDecision.Embed;
             ObserveNavigation(app.Id,true,e.Uri,decision,e.IsRedirected,e.IsUserInitiated);
@@ -179,7 +186,7 @@ internal sealed partial class HostWindow
             ObserveNavigation(app.Id,true,core.Source,NavigationDecision.Embed,false,false,e.HttpStatusCode);
             if(e.WebErrorStatus==CoreWebView2WebErrorStatus.OperationCanceled) return;
             surface.SetLocation(core.Source,ok ? "" : NavigationError(e));
-            if(ok && AppReturnPolicy.IsAppReturn(app,core.Source,waitingForSignIn,_fixture ? new Uri(_fixtureBase!) : null)) {
+            if(ok && AppReturnPolicy.IsAppReturn(app,core.Source,waitingForSignIn,_options.Fixture ? new Uri(_fixtureBase!) : null)) {
                 try { await PromoteAuthAsync(app,web,surface,epoch); }
                 catch(OperationCanceledException) when(!IsAppEpochCurrent(app.Id,epoch)) { }
                 catch(ObjectDisposedException) when(!IsAppEpochCurrent(app.Id,epoch)) { }
@@ -201,7 +208,9 @@ internal sealed partial class HostWindow
         _ownedPopups.RemoveAll(x=>ReferenceEquals(x.Window,surface));
         _panel.PromotePopup(surface,web); _promotedAuthViews++;
         await ConfigureMainViewAsync(app,web,false,epoch);
-        if(_fixture && UnloadRegressionPromotionConfiguredHook is { } promotionConfigured) await promotionConfigured();
+#if TEST_HARNESS
+        if(_options.Fixture && UnloadRegressionPromotionConfiguredHook is { } promotionConfigured) await promotionConfigured();
+#endif
         if(!IsAppEpochCurrent(app.Id,epoch) || !IsCurrent(app,web)) return;
         surface.MainHandlersReady=true;
         if(_state.IsVisible && _state.ActiveId==app.Id) _panel.SetStatus(DescribePage(app,web.CoreWebView2.Source));

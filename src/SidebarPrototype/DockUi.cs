@@ -68,7 +68,7 @@ internal sealed partial class HostWindow
 
     private void RefreshConfiguredLaunchers()
     {
-        _configuredLaunchers = _fixture && !_uiTest ? Launchers.All : LauncherCatalog.For(_settings);
+        _configuredLaunchers = _options.Fixture && !_options.UiTest ? Launchers.All : LauncherCatalog.For(_settings);
     }
 
     internal void ReorderLaunchers(IReadOnlyList<string> ids)
@@ -271,7 +271,7 @@ internal sealed partial class HostWindow
             try { var id=await AddLauncherFromFormAsync(name.Text,url.Text,_pendingIconFile,favicon.IsChecked==true); if(id is not null) dialog.DialogResult=true; }
             catch(Exception e) { System.Windows.MessageBox.Show(dialog,e.Message,"Add App",MessageBoxButton.OK,MessageBoxImage.Information); }
         };
-        dialog.Content=grid; dialog.Loaded+=(_,_)=> { if(!_uiTest) name.Focus(); }; return dialog;
+        dialog.Content=grid; dialog.Loaded+=(_,_)=> { if(!_options.UiTest) name.Focus(); }; return dialog;
     }
 
     private async Task<string?> AddLauncherFromFormAsync(string name,string url,string? iconFile,bool useFavicon)
