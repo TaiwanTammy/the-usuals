@@ -9,3 +9,4 @@ toolchain/
 
 # Personal session backup for the Sessions extension
 extension/import.json
+extension/remove.json

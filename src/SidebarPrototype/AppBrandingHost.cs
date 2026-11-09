@@ -5,7 +5,6 @@ internal sealed partial class HostWindow
     private readonly System.Windows.Threading.DispatcherTimer _brandingTimer = new() { Interval = TimeSpan.FromHours(6) };
     private string _brandName = AppBranding.TheUsuals;
     private System.Windows.Controls.TextBlock? _brandingHeader;
-    private System.Windows.Window? _addAppDialog;
 
     private void InitializeBranding()
     {
@@ -41,6 +40,5 @@ internal sealed partial class HostWindow
         Title = _brandName;
         if (_tray is not null) _tray.Text = _brandName;
         if (_brandingHeader is not null) _brandingHeader.Text = _brandName;
-        if (_addAppDialog is not null) _addAppDialog.Title = $"Add App · {_brandName}";
     }
 }

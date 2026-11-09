@@ -96,6 +96,12 @@ internal sealed partial class HostWindow
             results["settingsMenu"]=CaptureSettingsMenu(Path.Combine(_root,"settings-menu.png"));
             results["sessionsPanel"]=CaptureSessionsPanel(Path.Combine(_root,"sessions-panel.png"));
             results["addApp"]=CaptureAddApp(Path.Combine(_root,"add-app.png"));
+            RemoveLauncherForTest("soundcloud");
+            Check("removedBuiltInLeavesDock",ConfiguredLaunchers.All(x=>x.Id!="soundcloud") && _settings.RemovedLaunchers.Contains("soundcloud"));
+            results["addAppWithPutBack"]=CaptureAddApp(Path.Combine(_root,"add-app-put-back.png"));
+            RestoreLauncherForTest("soundcloud");
+            ReorderLaunchers(original.Select(x=>x.Id).ToArray());
+            Check("removedBuiltInComesBack",ConfiguredLaunchers.Select(x=>x.Id).SequenceEqual(original.Select(x=>x.Id)) && _settings.RemovedLaunchers.Count==0);
 
             var hwnd=new WindowInteropHelper(_panel).Handle;
             var rectOk=NativeMethods.GetWindowRect(hwnd,out var outer) && UiGetClientRect(hwnd,out var client);
@@ -142,6 +148,8 @@ internal sealed partial class HostWindow
             var restored=LauncherCatalog.For(loaded);
             Check("customAppsAndOrderSurviveSettingsReload",restored.Select(x=>x.Id).SequenceEqual(requested) && restored.Single(x=>x.Id==firstCustom.Id).Profile==firstCustom.Profile && restored.Single(x=>x.Id==secondCustom.Id).StartUri==secondCustom.StartUri);
             Check("builtInAccountProfilesPreserved",original.All(x=>restored.Single(y=>y.Id==x.Id).Profile==x.Profile));
+            RemoveLauncherForTest(firstCustom.Id);
+            Check("removedCustomAppIsGone",ConfiguredLaunchers.All(x=>x.Id!=firstCustom.Id) && _settings.CustomLaunchers.All(x=>x.Id!=firstCustom.Id) && !_views.ContainsKey(firstCustom.Id));
             var malformedFile=Path.Combine(_root,"malformed-custom-settings.json");
             File.WriteAllText(malformedFile,"""
                 {"DockWidth":45,"Launchers":{"gmail-a":{"Zoom":1.4}},"LauncherOrder":[null,"gmail-a"],"CustomLaunchers":[{"Id":null,"Label":null,"Url":null,"Profile":null}]}

@@ -32,7 +32,6 @@ internal sealed partial class HostWindow
     private WpfPoint _dragStart;
     private bool _suppressDockClick;
     private readonly DispatcherTimer _dragClickReset = new() { Interval=TimeSpan.FromMilliseconds(350) };
-    private string? _pendingIconFile;
 
     private IReadOnlyList<Launcher> _configuredLaunchers = Launchers.All;
     internal IReadOnlyList<Launcher> ConfiguredLaunchers => _configuredLaunchers;
@@ -99,24 +98,9 @@ internal sealed partial class HostWindow
         _dock.Children.Add(scroll); _dock.Children.Add(_bottomButtons);
         RebuildLauncherButtons();
 
-        var add = CreateDockButton("+", "Add App", "Add App", 36, 36);
-        AutomationProperties.SetName(add, "Add App");
-        add.Click += (_, _) => ShowAddAppDialog();
-        _bottomButtons.Children.Add(add);
-
+        _bottomButtons.Children.Add(CreateAddButton());
         AddSessionsButton();
-
-        var settings = new WpfButton { Content = new TextBlock { Text="\uE713", FontFamily=new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize=16, Foreground=Brushes.LightGray }, Width=36, Height=36, Margin=new Thickness(0,4,0,0), Padding=new Thickness(8), Background=Brushes.Transparent, BorderBrush=Brushes.Transparent, Style=FlatButtonStyle, ToolTip="Settings", Tag="settings" };
-        AutomationProperties.SetName(settings, "Settings");
-        settings.ContextMenu = CreateFlatMenu();
-        _brandingHeader = new TextBlock { Text=_brandName, Foreground=BrushFor(170), FontSize=12, FontWeight=FontWeights.SemiBold, TextTrimming=TextTrimming.CharacterEllipsis };
-        settings.ContextMenu.Items.Add(new Border { Child=_brandingHeader, Padding=new Thickness(12,8,16,8), IsHitTestVisible=false, Focusable=false });
-        var shortcut = NewMenuItem("Keyboard shortcut…"); shortcut.Click += (_, _) => ConfigureShortcut(); settings.ContextMenu.Items.Add(shortcut);
-        settings.ContextMenu.Items.Add(new Border { Height=1, Background=BrushFor(70), Margin=new Thickness(8,3,8,3) });
-        var hide = NewMenuItem("Hide sidebar"); hide.Click += (_, _) => HideUtility(); settings.ContextMenu.Items.Add(hide);
-        var quit = NewMenuItem("Quit sidebar"); quit.Click += (_, _) => Quit(); settings.ContextMenu.Items.Add(quit);
-        settings.Click += (_, _) => settings.ContextMenu.IsOpen = true;
-        _bottomButtons.Children.Add(settings);
+        _bottomButtons.Children.Add(CreateSettingsButton());
     }
 
     private void RebuildLauncherButtons()
@@ -157,7 +141,7 @@ internal sealed partial class HostWindow
         var button = new WpfButton { Content=icon, Tag=launcher.Id, Height=46, Margin=new Thickness(0,1,0,1), Foreground=Brushes.White, Background=Brushes.Transparent, BorderBrush=Brushes.Transparent, Style=FlatButtonStyle, ToolTip=launcher.Label, Focusable=true };
         button.SetValue(IsDockActiveProperty,_state.ActiveId==launcher.Id);
         AutomationProperties.SetName(button, launcher.Label);
-        var appMenu = CreateFlatMenu(); var unload = NewMenuItem("Close"); unload.ToolTip="Unload this app from memory; account sign-in stays saved."; unload.Click += (_, _) => UnloadLauncher(launcher); appMenu.Items.Add(unload); button.ContextMenu=appMenu;
+        var appMenu = CreateFlatMenu(); var unload = NewMenuItem("Close"); unload.ToolTip="Unload this app from memory; account sign-in stays saved."; unload.Click += (_, _) => UnloadLauncher(launcher); appMenu.Items.Add(unload); var remove = NewMenuItem("Remove from dock"); remove.Click += (_, _) => RemoveLauncher(launcher); appMenu.Items.Add(remove); button.ContextMenu=appMenu;
         button.MouseEnter += (_, _) => imageColor.Opacity = 1;
         button.MouseLeave += (_, _) => imageColor.Opacity = 0;
         button.Click += async (_, _) => { if(_suppressDockClick)return; await ActivateFromDockAsync(launcher); };
@@ -243,47 +227,6 @@ internal sealed partial class HostWindow
         var content=new FrameworkElementFactory(typeof(ItemsPresenter)); content.SetValue(ItemsPresenter.MarginProperty,new Thickness(2)); border.AppendChild(content); template.VisualTree=border; return template;
     }
 
-    private void ShowAddAppDialog()
-    {
-        _pendingIconFile=null; 
-        CreateAddAppDialog().ShowDialog();
-    }
-
-    private Window CreateAddAppDialog()
-    {
-        var dialog=new Window { Title=$"Add App · {_brandName}", Width=390, Height=370, ResizeMode=ResizeMode.NoResize, WindowStartupLocation=WindowStartupLocation.CenterOwner, Owner=this, Background=BrushFor(28), Foreground=Brushes.White, ShowInTaskbar=false };
-        _addAppDialog=dialog;
-        dialog.Closed+=(_,_)=>{ if(ReferenceEquals(_addAppDialog,dialog)) _addAppDialog=null; };
-        var grid=new Grid { Margin=new Thickness(20) }; for(var i=0;i<6;i++) grid.RowDefinitions.Add(new RowDefinition { Height=i==3?new GridLength(1,GridUnitType.Star):GridLength.Auto });
-        grid.Children.Add(new TextBlock { Text="Add an app to your dock", FontSize=18, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,14) });
-        var name=new TextBox { Margin=new Thickness(0,4,0,8), Height=32, Padding=new Thickness(8), Background=BrushFor(42), Foreground=Brushes.White, BorderBrush=BrushFor(76), ToolTip="App name" };
-        var nameField=new StackPanel(); nameField.Children.Add(new TextBlock { Text="App name", FontSize=12, Foreground=BrushFor(180) }); nameField.Children.Add(name); Grid.SetRow(nameField,1); grid.Children.Add(nameField);
-        var url=new TextBox { Margin=new Thickness(0,4,0,8), Height=32, Padding=new Thickness(8), Background=BrushFor(42), Foreground=Brushes.White, BorderBrush=BrushFor(76), ToolTip="Website address" };
-        var urlField=new StackPanel(); urlField.Children.Add(new TextBlock { Text="Website address", FontSize=12, Foreground=BrushFor(180) }); urlField.Children.Add(url); Grid.SetRow(urlField,2); grid.Children.Add(urlField);
-        var favicon=new RadioButton { Content="Use website favicon", IsChecked=true, Foreground=Brushes.LightGray, Margin=new Thickness(0,0,0,8) };
-        var fileChoice=new RadioButton { Content="Choose an icon file…", Foreground=Brushes.LightGray, VerticalAlignment=VerticalAlignment.Top, Margin=new Thickness(0,0,0,2) };
-        var iconPath=new TextBlock { Foreground=BrushFor(180), Margin=new Thickness(22,2,0,0), TextTrimming=TextTrimming.CharacterEllipsis };
-        var iconChoices=new StackPanel { Orientation=System.Windows.Controls.Orientation.Vertical, Margin=new Thickness(0,8,0,0) }; iconChoices.Children.Add(favicon); iconChoices.Children.Add(fileChoice); iconChoices.Children.Add(iconPath); Grid.SetRow(iconChoices,3); grid.Children.Add(iconChoices);
-        var buttons=new StackPanel { Orientation=System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment=System.Windows.HorizontalAlignment.Right, VerticalAlignment=VerticalAlignment.Bottom };
-        var cancel=new WpfButton { Content="Cancel", Width=82, Height=32, Margin=new Thickness(0,0,8,0), Style=FlatButtonStyle, Foreground=Brushes.LightGray, Background=Brushes.Transparent, BorderBrush=BrushFor(76) }; cancel.Click+=(_,_)=>dialog.DialogResult=false;
-        var add=new WpfButton { Content="Add App", Width=88, Height=32, Style=FlatButtonStyle, Foreground=Brushes.White, Background=BrushFor(54), BorderBrush=BrushFor(76) };
-        buttons.Children.Add(cancel); buttons.Children.Add(add); Grid.SetRow(buttons,5); grid.Children.Add(buttons);
-        fileChoice.Checked+=(_,_)=>{ var picker=new Microsoft.Win32.OpenFileDialog { Title="Choose an app icon", Filter="Images|*.png;*.jpg;*.jpeg;*.ico;*.bmp|All files|*.*" }; if(picker.ShowDialog(dialog)==true){_pendingIconFile=picker.FileName;iconPath.Text=Path.GetFileName(picker.FileName);} else favicon.IsChecked=true; };
-        add.Click+=async (_,_)=>{
-            try { var id=await AddLauncherFromFormAsync(name.Text,url.Text,_pendingIconFile,favicon.IsChecked==true); if(id is not null) dialog.DialogResult=true; }
-            catch(Exception e) { System.Windows.MessageBox.Show(dialog,e.Message,"Add App",MessageBoxButton.OK,MessageBoxImage.Information); }
-        };
-        dialog.Content=grid; dialog.Loaded+=(_,_)=> { if(!_options.UiTest) name.Focus(); }; return dialog;
-    }
-
-    private async Task<string?> AddLauncherFromFormAsync(string name,string url,string? iconFile,bool useFavicon)
-    {
-        if(!useFavicon && string.IsNullOrWhiteSpace(iconFile)) throw new FormatException("Choose an icon file or use the website favicon.");
-        var selectedIcon=useFavicon ? null : iconFile;
-        if(!TryAddLauncher(name,url,selectedIcon,out var error)) throw new FormatException(error);
-        return ConfiguredLaunchers.Last().Id;
-    }
-
     private static async Task<string?> TrySaveWebsiteFaviconAsync(string id,string url,string directory)
     {
         try {
@@ -298,16 +241,6 @@ internal sealed partial class HostWindow
     }
 
     internal object? CaptureDock(string path) => CaptureElement(_dock,path);
-    internal object? CaptureSettingsMenu(string path)
-    {
-        var settings=_bottomButtons.Children.OfType<WpfButton>().LastOrDefault(); if(settings?.ContextMenu is not { } menu) return null;
-        menu.PlacementTarget=settings; menu.Placement=PlacementMode.Right; menu.IsOpen=true; menu.UpdateLayout(); Dispatcher.Invoke(DispatcherPriority.Render,()=>{}); var result=CaptureElement(menu,path); menu.IsOpen=false; return result;
-    }
-    internal object? CaptureAddApp(string path)
-    {
-        _pendingIconFile=null; 
-        var dialog=CreateAddAppDialog(); dialog.ShowActivated=false; dialog.Show(); Dispatcher.Invoke(DispatcherPriority.Render,()=>{}); var r=CaptureElement(dialog,path); dialog.Close(); return r;
-    }
     private static object? CaptureElement(FrameworkElement element,string path)
     {
         try { element.UpdateLayout(); var width=(int)Math.Ceiling(element.ActualWidth); var height=(int)Math.Ceiling(element.ActualHeight); if(width<=0||height<=0)return null; var bmp=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32); bmp.Render(element); using var fs=File.Create(path); var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bmp)); encoder.Save(fs); return new { path,width,height }; } catch { return null; }

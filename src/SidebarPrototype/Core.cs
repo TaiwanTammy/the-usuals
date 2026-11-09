@@ -27,6 +27,7 @@ public sealed class AppSettings
     public Dictionary<string, LauncherSetting> Launchers { get; set; } = [];
     public List<CustomLauncherDefinition> CustomLaunchers { get; set; } = [];
     public List<string> LauncherOrder { get; set; } = [];
+    public List<string> RemovedLaunchers { get; set; } = [];
     public static AppSettings SafeLoad(string file)
     {
         try { if (File.Exists(file)) return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(file), JsonOptions())?.Validate() ?? new(); }
@@ -43,6 +44,7 @@ public sealed class AppSettings
         Launchers ??= [];
         CustomLaunchers ??= [];
         LauncherOrder ??= [];
+        RemovedLaunchers = (RemovedLaunchers ?? []).Where(id => SidebarPrototype.Launchers.All.Any(x => x.Id == id)).Distinct(StringComparer.Ordinal).ToList();
         CustomLaunchers = CustomLaunchers.Where(x => x is not null && LauncherCatalog.IsValidDefinition(x)).GroupBy(x => x.Id, StringComparer.Ordinal).Select(x => x.First()).ToList();
         LauncherOrder = LauncherOrder.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
         foreach (var x in CustomLaunchers) if (x.IconPath is { } icon && (Path.GetFileName(icon) != icon || icon.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)) x.IconPath = null;
@@ -101,7 +103,8 @@ public static class LauncherCatalog
 
     public static IReadOnlyList<Launcher> For(AppSettings settings)
     {
-        var all=Launchers.All.Concat(settings.CustomLaunchers.Where(IsValidDefinition).Select(ToLauncher)).ToDictionary(x=>x.Id,StringComparer.Ordinal);
+        var removed=settings.RemovedLaunchers ?? [];
+        var all=Launchers.All.Where(x=>!removed.Contains(x.Id)).Concat(settings.CustomLaunchers.Where(IsValidDefinition).Select(ToLauncher)).ToDictionary(x=>x.Id,StringComparer.Ordinal);
         var order=settings.LauncherOrder.Where(id=>!string.IsNullOrWhiteSpace(id)&&all.ContainsKey(id)).Distinct(StringComparer.Ordinal).ToList();
         order.AddRange(all.Keys.Where(id=>!order.Contains(id,StringComparer.Ordinal)));
         return order.Select(id=>all[id]).ToArray();
