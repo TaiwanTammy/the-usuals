@@ -104,6 +104,8 @@ internal sealed partial class HostWindow
         add.Click += (_, _) => ShowAddAppDialog();
         _bottomButtons.Children.Add(add);
 
+        AddSessionsButton();
+
         var settings = new WpfButton { Content = new TextBlock { Text="\uE713", FontFamily=new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize=16, Foreground=Brushes.LightGray }, Width=36, Height=36, Margin=new Thickness(0,4,0,0), Padding=new Thickness(8), Background=Brushes.Transparent, BorderBrush=Brushes.Transparent, Style=FlatButtonStyle, ToolTip="Settings", Tag="settings" };
         AutomationProperties.SetName(settings, "Settings");
         settings.ContextMenu = CreateFlatMenu();

@@ -12,6 +12,9 @@ public sealed class App : System.Windows.Application
     [STAThread]
     public static int Main(string[] args)
     {
+        // Chrome starts this exe to connect the Sessions extension; that copy only relays messages.
+        if (ChromeBridgeRelay.IsChromeLaunch(args))
+            return ChromeBridgeRelay.Run();
 #if TEST_HARNESS
         if (args.Contains("--self-test"))
             return SelfTests.Run();

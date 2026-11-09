@@ -94,6 +94,7 @@ internal sealed partial class HostWindow
             Check("accountDividerPresent",dockJson.GetProperty("hasAccountDivider").GetBoolean());
             Check("officialIconsRevealRealColor",original.All(x=>IconHasGrayscaleAndColor(x.Id)));
             results["settingsMenu"]=CaptureSettingsMenu(Path.Combine(_root,"settings-menu.png"));
+            results["sessionsPanel"]=CaptureSessionsPanel(Path.Combine(_root,"sessions-panel.png"));
             results["addApp"]=CaptureAddApp(Path.Combine(_root,"add-app.png"));
 
             var hwnd=new WindowInteropHelper(_panel).Handle;
