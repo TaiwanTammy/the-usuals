@@ -73,7 +73,7 @@ internal sealed partial class PanelWindow : Window
         Group(3,_zoomOutButton,_zoomPercent,_zoomInButton,_themeButton,_deviceButton);
         var mode=AddPath(PinIcon,"mode","Pin panel",24); _modeButton=mode;
         _browserButton=AddPath("M14 3 H21 V10 M21 3 L11 13 M18 13 V20 H4 V6 H11","external","Open in browser",24);
-        _closeButton=AddPath("M6 6 L18 18 M18 6 L6 18","close","Hide panel and keep this app loaded. Right-click its dock icon to close the app.",24);
+        _closeButton=AddPath("M6 6 L18 18 M18 6 L6 18","close","Hide panel and keep this app loaded. Right-click its sidebar icon to close the app.",24);
         var windowGroup=Group(5,mode,_browserButton,_closeButton); ((FrameworkElement)windowGroup.Parent).Margin=new Thickness(2,0,4,0);
         RebuildOverflow();
         _toolbar=bar; bar.SizeChanged+=(_,_)=>UpdateCompactToolbar(); bar.Loaded+=(_,_)=>UpdateCompactToolbar();

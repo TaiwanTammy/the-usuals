@@ -104,6 +104,17 @@ internal sealed partial class HostWindow
             if (_options.BrowserOnly || (_options.TransitionTest && !_options.TransitionNative))
                 ApplyLayout();
         }
+        else if (GetPanelWidth(setting) is var width && Math.Abs(width - _openWidth) > 1)
+        {
+            // Each app keeps its own panel width. Only a real difference moves anything, so switching between
+            // apps of the same width never touches the layout.
+            _openWidth = width;
+            var raisedByReservation = _openMode == PanelMode.Split;
+            if (raisedByReservation)
+                Reserve(_settings.DockWidth, width);
+            if (!raisedByReservation || _options.BrowserOnly || (_options.TransitionTest && !_options.TransitionNative))
+                ApplyLayout();
+        }
         _panel.SetStatus($"Opening {launcher.Label}…");
         _panel.Show();
         if (!_options.BrowserOnly && !_options.LayoutOnly && !_options.TransitionTest)

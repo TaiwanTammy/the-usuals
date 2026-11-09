@@ -55,7 +55,7 @@ internal sealed partial class HostWindow
         AutomationProperties.SetName(button, "Chrome sessions");
         _sessionsPopup = new Popup
         {
-            PlacementTarget = button, Placement = PlacementMode.Right, HorizontalOffset = 6, StaysOpen = false, AllowsTransparency = true,
+            PlacementTarget = button, Placement = PlacementMode.Custom, CustomPopupPlacementCallback = BesideButtonGrowingUp, StaysOpen = false, AllowsTransparency = true,
             Child = new Border
             {
                 Width = 400, Background = BrushFor(30), BorderBrush = BrushFor(72), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(6),

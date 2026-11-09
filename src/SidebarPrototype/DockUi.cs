@@ -141,7 +141,7 @@ internal sealed partial class HostWindow
         var button = new WpfButton { Content=icon, Tag=launcher.Id, Height=46, Margin=new Thickness(0,1,0,1), Foreground=Brushes.White, Background=Brushes.Transparent, BorderBrush=Brushes.Transparent, Style=FlatButtonStyle, ToolTip=launcher.Label, Focusable=true };
         button.SetValue(IsDockActiveProperty,_state.ActiveId==launcher.Id);
         AutomationProperties.SetName(button, launcher.Label);
-        var appMenu = CreateFlatMenu(); var unload = NewMenuItem("Close"); unload.ToolTip="Unload this app from memory; account sign-in stays saved."; unload.Click += (_, _) => UnloadLauncher(launcher); appMenu.Items.Add(unload); var remove = NewMenuItem("Remove from dock"); remove.Click += (_, _) => RemoveLauncher(launcher); appMenu.Items.Add(remove); button.ContextMenu=appMenu;
+        var appMenu = CreateFlatMenu(); var unload = NewMenuItem("Close"); unload.ToolTip="Unload this app from memory; account sign-in stays saved."; unload.Click += (_, _) => UnloadLauncher(launcher); appMenu.Items.Add(unload); var remove = NewMenuItem("Remove from sidebar"); remove.Click += (_, _) => RemoveLauncher(launcher); appMenu.Items.Add(remove); button.ContextMenu=appMenu;
         button.MouseEnter += (_, _) => imageColor.Opacity = 1;
         button.MouseLeave += (_, _) => imageColor.Opacity = 0;
         button.Click += async (_, _) => { if(_suppressDockClick)return; await ActivateFromDockAsync(launcher); };

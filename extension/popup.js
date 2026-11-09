@@ -153,9 +153,9 @@ function render() {
   $('#note').hidden = !data.otherWindow;
   $('#note').textContent = 'Your sessions live in your other Chrome window. Switching will happen there.';
 
-  // With The Usuals running, everyday sites belong in its dock: no pinning here, just a way to send old pins over.
+  // With The Usuals running, everyday sites belong in the sidebar: no pinning here, just a way to send old pins over.
   $('.pinned').hidden = !!data.usuals && !data.pinned.length;
-  $('#pin').textContent = data.usuals ? `Move to ${data.usuals}` : 'Pin this tab';
+  $('#pin').textContent = data.usuals ? 'Pin to sidebar' : 'Pin this tab';
   $('#pins').innerHTML = data.pinned.length
     ? data.pinned
         .map(

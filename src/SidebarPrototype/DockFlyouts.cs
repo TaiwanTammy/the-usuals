@@ -22,9 +22,14 @@ internal sealed partial class HostWindow
 
     private Popup CreateFlyout(UIElement target, double width) => new()
     {
-        PlacementTarget = target, Placement = PlacementMode.Right, HorizontalOffset = 6, StaysOpen = false, AllowsTransparency = true,
+        PlacementTarget = target, Placement = PlacementMode.Custom, CustomPopupPlacementCallback = BesideButtonGrowingUp, StaysOpen = false, AllowsTransparency = true,
         Child = new Border { Width = width, Background = BrushFor(30), BorderBrush = BrushFor(72), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(6) },
     };
+
+    // Bottom edge lines up with the button's bottom edge, so a panel opened from the bottom of the sidebar grows
+    // upward next to its button instead of sliding down against the screen edge.
+    internal static CustomPopupPlacement[] BesideButtonGrowingUp(System.Windows.Size popup, System.Windows.Size target, System.Windows.Point offset) =>
+        [new CustomPopupPlacement(new System.Windows.Point(target.Width + target.Width / 6, target.Height - popup.Height), PopupPrimaryAxis.Horizontal)];
 
     private static void SetFlyoutContent(Popup popup, UIElement content) => ((Border)popup.Child).Child = content;
 
@@ -120,7 +125,17 @@ internal sealed partial class HostWindow
         list.Children.Add(FlyoutHeading("Add app"));
         var (urlField, url) = FlyoutTextBox("Website address");
         var (nameField, name) = FlyoutTextBox("Name (optional)");
-        list.Children.Add(urlField); list.Children.Add(nameField);
+        var paste = new WpfButton { Content = new TextBlock { Text = "", FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 14, Foreground = Brushes.LightGray }, Width = 30, Height = 30, Margin = new Thickness(0, 0, 4, 6), Style = FlatButtonStyle, Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, ToolTip = "Paste" };
+        AutomationProperties.SetName(paste, "Paste");
+        paste.Click += (_, _) => { if (ClipboardText() is { } text) { url.Text = text; url.CaretIndex = text.Length; } url.Focus(); };
+        urlField.Margin = new Thickness(4, 0, 4, 6);
+        var urlRow = new Grid();
+        urlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        urlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(paste, 1); urlRow.Children.Add(urlField); urlRow.Children.Add(paste);
+        list.Children.Add(urlRow); list.Children.Add(nameField);
+        // A web address already on the clipboard is filled in, ready to add.
+        if (!_options.UiTest && ClipboardText() is { } copied && LooksLikeAddress(copied)) url.Text = copied;
 
         var error = new TextBlock { Foreground = new SolidColorBrush(Color.FromRgb(255, 150, 150)), FontSize = 12, Margin = new Thickness(6, 0, 6, 6), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
         list.Children.Add(error);
@@ -175,6 +190,17 @@ internal sealed partial class HostWindow
         SetFlyoutContent(_addFlyout!, list);
         _addFlyout!.Opened -= FocusAddressOnOpen; _addFlyout.Opened += FocusAddressOnOpen;
         void FocusAddressOnOpen(object? s, EventArgs e) { if (!_options.UiTest) Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { Activate(); url.Focus(); Keyboard.Focus(url); }); }
+    }
+
+    private static string? ClipboardText()
+    {
+        try { return System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText().Trim() : null; } catch { return null; }
+    }
+
+    private static bool LooksLikeAddress(string text)
+    {
+        if (text.Length is 0 or > 2000 || text.Any(char.IsWhiteSpace) || !text.Contains('.')) return false;
+        try { LauncherCatalog.NormalizeUrl(text); return true; } catch { return false; }
     }
 
     // ---- Remove / put back ----

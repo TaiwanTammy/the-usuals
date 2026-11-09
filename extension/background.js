@@ -564,7 +564,7 @@ function flashBadge(text) {
 // ---------- The Usuals: the sidebar app on the desktop ----------
 //
 // If The Usuals is installed, Chrome starts its small relay program and keeps a line open to it. Over that line
-// the sidebar gets the session list (to show and switch from its dock) and receives tabs moved to it.
+// the sidebar gets the session list (to show and switch from the sidebar) and receives tabs moved to it.
 
 const USUALS = 'com.theusuals.bridge';
 let usuals = null; // the open line, or null
@@ -665,7 +665,7 @@ function appName(title, url) {
   return (parts.length > 1 ? parts[parts.length - 1] : parts[0] || hostOf(url)).slice(0, 48);
 }
 
-// Hand a tab to The Usuals as a dock app, then close it here (and stop pinning it, if it was pinned).
+// Hand a tab to The Usuals as a sidebar app, then close it here (and stop pinning it, if it was pinned).
 async function _moveToUsuals(tab) {
   if (!usualsName || !tab) return;
   const r = realTab(tab);
@@ -710,12 +710,16 @@ async function buildMenus() {
   };
   for (const ctx of ['tab', 'action']) {
     const root = `root|${ctx}`;
-    add({ id: root, title: 'Move to session', contexts: [ctx] });
-    add({ id: `new|${ctx}`, parentId: root, title: 'New session…', contexts: [ctx] });
-    if (others.length) add({ id: `sep|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
+    // Move tab to ▸ Pin to sidebar, a line, then the other sessions, then New session… at the bottom.
+    add({ id: root, title: 'Move tab to', contexts: [ctx] });
+    if (usualsName) {
+      add({ id: `usuals|${ctx}`, parentId: root, title: 'Pin to sidebar', contexts: [ctx] });
+      add({ id: `sepu|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
+    }
     for (const s of others) add({ id: `to|${ctx}|${s.id}`, parentId: root, title: label(s.name), contexts: [ctx] });
+    if (others.length) add({ id: `sep|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
+    add({ id: `new|${ctx}`, parentId: root, title: 'New session…', contexts: [ctx] });
   }
-  if (usualsName) add({ id: 'usuals', title: `Move to ${label(usualsName)}`, contexts: ['tab'] });
   if (others[0]) add({ id: 'back', title: `Back to ${label(others[0].name)}`, contexts: ['action'] });
 }
 
@@ -808,7 +812,7 @@ chrome.windows.onCreated.addListener((w) => {
   });
 });
 
-// Session added, renamed, deleted or switched: the "Move to session" lists change.
+// Session added, renamed, deleted or switched: the "Move tab to" lists change.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   const relevant = Object.entries(changes).some(
