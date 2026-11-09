@@ -48,7 +48,7 @@ internal sealed partial class PanelWindow : Window
     {
         _host = host; Title = "Sidebar content · Edgebar"; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.CanResize; Background = System.Windows.Media.Brushes.Black; ShowInTaskbar = false; Topmost = true;
         // Keep the panel visually flush with the dock while retaining a native right-edge resize target.
-        WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 0, ResizeBorderThickness = new Thickness(0, 0, 6, 0), GlassFrameThickness = new Thickness(0), CornerRadius = new CornerRadius(0), UseAeroCaptionButtons = false });
+        WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 0, ResizeBorderThickness = new Thickness(0, 0, ResizeGripWidth, 0), GlassFrameThickness = new Thickness(0), CornerRadius = new CornerRadius(0), UseAeroCaptionButtons = false });
         _status.Visibility=Visibility.Collapsed; _statusTimer.Tick+=(_,_)=> { _statusTimer.Stop(); _status.Visibility=Visibility.Collapsed; };
         Closing+=(_,e)=> { CloseAttemptCount++; if(!host.IsQuitting) { e.Cancel=true; var userRequested=_userCloseRequested; _userCloseRequested=false; if(userRequested) host.OnToolbar("close"); } };
         // The owner assigns its handle before the first reservation; install the diagnostic hook there.
@@ -77,7 +77,11 @@ internal sealed partial class PanelWindow : Window
         var windowGroup=Group(5,mode,_browserButton,_closeButton); ((FrameworkElement)windowGroup.Parent).Margin=new Thickness(2,0,4,0);
         RebuildOverflow();
         _toolbar=bar; bar.SizeChanged+=(_,_)=>UpdateCompactToolbar(); bar.Loaded+=(_,_)=>UpdateCompactToolbar();
-        DockPanel.SetDock(bar, Dock.Top); _root.Children.Add(bar); DockPanel.SetDock(_outsideLink,Dock.Top); _root.Children.Add(_outsideLink); _outsideLink.Click+=(_,_)=> { _outsideLink.Visibility=Visibility.Collapsed; _outsideAction?.Invoke(); }; var contentSurface=new Grid(); contentSurface.Children.Add(_content); _status.HorizontalAlignment=System.Windows.HorizontalAlignment.Right; _status.VerticalAlignment=System.Windows.VerticalAlignment.Top; _status.Margin=new Thickness(8); contentSurface.Children.Add(_status); _root.Children.Add(contentSurface);
+        DockPanel.SetDock(bar, Dock.Top); _root.Children.Add(bar); DockPanel.SetDock(_outsideLink,Dock.Top); _root.Children.Add(_outsideLink);
+        // The page is its own window and would swallow the mouse along the panel's right edge, leaving only the
+        // toolbar grabbable. This strip keeps the full height of the edge free for resizing.
+        var grip=new Border { Width=ResizeGripWidth, Background=Brushes.Black, Child=new Border { Width=1, Background=new SolidColorBrush(Color.FromRgb(40,40,40)), HorizontalAlignment=System.Windows.HorizontalAlignment.Center } };
+        DockPanel.SetDock(grip,Dock.Right); _root.Children.Add(grip); _outsideLink.Click+=(_,_)=> { _outsideLink.Visibility=Visibility.Collapsed; _outsideAction?.Invoke(); }; var contentSurface=new Grid(); contentSurface.Children.Add(_content); _status.HorizontalAlignment=System.Windows.HorizontalAlignment.Right; _status.VerticalAlignment=System.Windows.VerticalAlignment.Top; _status.Margin=new Thickness(8); contentSurface.Children.Add(_status); _root.Children.Add(contentSurface);
         bar.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) { host.OnToolbar("close"); e.Handled = true; } };
         Content = _root;
     }
@@ -105,6 +109,9 @@ internal sealed partial class PanelWindow : Window
         RebuildOverflow();
     }
     internal object CaptureOverflow(string path,double width) { var original=Width; Width=width; UpdateLayout(); UpdateCompactToolbar(); UpdateLayout(); _toolbar?.UpdateLayout(); _overflowMenu!.IsOpen=true; _overflowMenu.UpdateLayout(); Visual? popupContent=VisualTreeHelper.GetChildrenCount(_overflowMenu)>0 ? VisualTreeHelper.GetChild(_overflowMenu,0) as Visual : null; if(popupContent is System.Windows.Controls.Primitives.Popup popup) popupContent=popup.Child as Visual; popupContent ??= _overflowMenu; var bounds=VisualTreeHelper.GetDescendantBounds(popupContent); var size=bounds.IsEmpty ? ((FrameworkElement)popupContent).RenderSize : bounds.Size; var bmp=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(size.Width)),Math.Max(1,(int)Math.Ceiling(size.Height)),96,96,PixelFormats.Pbgra32); bmp.Render(popupContent); var enc=new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(bmp)); using(var s=File.Create(path)) enc.Save(s); var result=new { width=size.Width,height=size.Height,commands=_overflowMenu.Items.OfType<MenuItem>().Select(i=>i.Tag?.ToString() ?? "").ToArray() }; _overflowMenu.IsOpen=false; Width=original; UpdateLayout(); UpdateCompactToolbar(); return result; }
+    private const double ResizeGripWidth = 6;
+    // How far the page area stops short of the panel's right edge (the grab strip).
+    internal double PageRightGap() { var right=_content.TranslatePoint(new Point(_content.ActualWidth,0),this).X; return ActualWidth-right; }
     internal object CapturePanel(string path,double width) { var original=Width; Width=width; UpdateLayout(); var size=_root.RenderSize; var bmp=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(size.Width)),Math.Max(1,(int)Math.Ceiling(size.Height)),96,96,PixelFormats.Pbgra32); bmp.Render(_root); var enc=new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(bmp)); using(var s=File.Create(path)) enc.Save(s); Width=original; UpdateLayout(); return new { width=size.Width,height=size.Height,windowStyle=WindowStyle.ToString(),resizeMode=ResizeMode.ToString(),resizeBorder=WindowChrome.GetWindowChrome(this)?.ResizeBorderThickness.ToString() }; }
     private static UIElement ToolbarIcon(string data) => new System.Windows.Shapes.Path { Data=Geometry.Parse(data),Stroke=Brushes.LightGray,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Fill=Brushes.Transparent,Width=14,Height=14,Stretch=Stretch.Uniform };
     private const string DesktopIcon="M3 5 H21 V16 H3 Z M9 20 H15 M12 16 V20";

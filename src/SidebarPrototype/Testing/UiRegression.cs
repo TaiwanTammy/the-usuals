@@ -118,6 +118,7 @@ internal sealed partial class HostWindow
             var hitPoint=new nint(((resizedRect.Top+100)&0xffff)<<16 | ((resizedRect.Right-1)&0xffff));
             var edgeHit=UiSendMessage(hwnd,0x0084,0,hitPoint).ToInt64();
             Check("rightEdgeRemainsResizable",edgeHit==11,new { hitTest=edgeHit });
+            Check("pageLeavesRightEdgeFreeForResizing",_panel.PageRightGap()>=5,new { gap=_panel.PageRightGap() });
 
             var invalidAdded=TryAddLauncher("Unsafe","javascript:alert(1)",null,out _);
             var credentialsAdded=TryAddLauncher("Unsafe","https://name:secret@example.test/",null,out _);

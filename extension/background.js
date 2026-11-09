@@ -695,7 +695,7 @@ async function buildMenus() {
   const others = (await allSessions())
     .filter((s) => s.id !== m.currentId)
     .sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0));
-  const sig = JSON.stringify([usualsName, others.map((s) => [s.id, s.name])]);
+  const sig = JSON.stringify([2, usualsName, others.map((s) => [s.id, s.name])]); // bump the first number when the menu's layout changes
   if ((await chrome.storage.session.get('menuSig')).menuSig === sig) return;
   await chrome.storage.session.set({ menuSig: sig });
 
@@ -710,15 +710,15 @@ async function buildMenus() {
   };
   for (const ctx of ['tab', 'action']) {
     const root = `root|${ctx}`;
-    // Move tab to ▸ Pin to sidebar, a line, then the other sessions, then New session… at the bottom.
+    // Move tab to ▸ the other sessions, New session…, a line, then Pin to sidebar last: it sends the tab out of
+    // Chrome entirely, so it sits apart from the session choices.
     add({ id: root, title: 'Move tab to', contexts: [ctx] });
-    if (usualsName) {
-      add({ id: `usuals|${ctx}`, parentId: root, title: 'Pin to sidebar', contexts: [ctx] });
-      add({ id: `sepu|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
-    }
     for (const s of others) add({ id: `to|${ctx}|${s.id}`, parentId: root, title: label(s.name), contexts: [ctx] });
-    if (others.length) add({ id: `sep|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
     add({ id: `new|${ctx}`, parentId: root, title: 'New session…', contexts: [ctx] });
+    if (usualsName) {
+      add({ id: `sepu|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
+      add({ id: `usuals|${ctx}`, parentId: root, title: 'Pin to sidebar', contexts: [ctx] });
+    }
   }
   if (others[0]) add({ id: 'back', title: `Back to ${label(others[0].name)}`, contexts: ['action'] });
 }
