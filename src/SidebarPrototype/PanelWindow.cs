@@ -71,7 +71,7 @@ internal sealed partial class PanelWindow : Window
         _themeButton=AddPath("M12 3 A9 9 0 1 0 12 21 A4.5 9 0 0 1 12 3 Z","theme","Dark mode",24);
         _deviceButton=AddPath(DesktopIcon,"identity","Desktop site",24);
         Group(3,_zoomOutButton,_zoomPercent,_zoomInButton,_themeButton,_deviceButton);
-        var mode=AddPath("M3 4 H17 V20 H3 Z M7 8 H20 V20 H7 Z","mode","Switch between drawer and side-by-side layout",24); _modeButton=mode;
+        var mode=AddPath(PinIcon,"mode","Pin panel",24); _modeButton=mode;
         _browserButton=AddPath("M14 3 H21 V10 M21 3 L11 13 M18 13 V20 H4 V6 H11","external","Open in browser",24);
         _closeButton=AddPath("M6 6 L18 18 M18 6 L6 18","close","Hide panel and keep this app loaded. Right-click its dock icon to close the app.",24);
         var windowGroup=Group(5,mode,_browserButton,_closeButton); ((FrameworkElement)windowGroup.Parent).Margin=new Thickness(2,0,4,0);
@@ -100,7 +100,7 @@ internal sealed partial class PanelWindow : Window
         }
         if(_deviceButton is not null) { var mobile=_activeSetting?.MobileMode==true; _deviceButton.Content=ToolbarIcon(mobile ? MobileIcon : DesktopIcon); _deviceButton.ToolTip=mobile ? "Mobile site" : "Desktop site"; System.Windows.Automation.AutomationProperties.SetName(_deviceButton,_deviceButton.ToolTip.ToString()); }
         if(_zoomPercent is not null) _zoomPercent.Content=$"{Math.Round((_activeSetting?.Zoom ?? 1)*100)}%";
-        if(_modeButton is not null) { _modeButton.Content=ModeIcon(_displayedMode ?? _activeSetting?.Mode ?? PanelMode.Overlay); _modeButton.ToolTip=(_displayedMode ?? _activeSetting?.Mode ?? PanelMode.Overlay)==PanelMode.Overlay ? "Drawer layout" : "Side-by-side layout"; }
+        if(_modeButton is not null) { _modeButton.Content=ModeIcon(_displayedMode ?? _activeSetting?.Mode ?? PanelMode.Overlay); _modeButton.ToolTip=(_displayedMode ?? _activeSetting?.Mode ?? PanelMode.Overlay)==PanelMode.Overlay ? "Pin panel" : "Unpin panel"; System.Windows.Automation.AutomationProperties.SetName(_modeButton,_modeButton.ToolTip.ToString()); }
         if(_themeButton is not null) { var dark=(_activeSetting?.Theme ?? SiteTheme.Dark)==SiteTheme.Dark; _themeButton.ToolTip=dark ? "Light mode" : "Dark mode"; _themeButton.Content=ToolbarIcon(dark ? "M12 3 A9 9 0 1 0 12 21 A4.5 9 0 0 1 12 3 Z" : "M12 3 V5 M12 19 V21 M3 12 H5 M19 12 H21 M5.6 5.6 L7 7 M17 17 L18.4 18.4 M18.4 5.6 L17 7 M7 17 L5.6 18.4 M12 8 A4 4 0 1 0 12 16 A4 4 0 1 0 12 8"); }
         RebuildOverflow();
     }
@@ -109,7 +109,9 @@ internal sealed partial class PanelWindow : Window
     private static UIElement ToolbarIcon(string data) => new System.Windows.Shapes.Path { Data=Geometry.Parse(data),Stroke=Brushes.LightGray,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Fill=Brushes.Transparent,Width=14,Height=14,Stretch=Stretch.Uniform };
     private const string DesktopIcon="M3 5 H21 V16 H3 Z M9 20 H15 M12 16 V20";
     private const string MobileIcon="M8 3 H16 V21 H8 Z M11 18 H13";
-    private static UIElement ModeIcon(PanelMode mode) => ToolbarIcon(mode==PanelMode.Overlay ? "M3 4 H18 V20 H3 Z M9 8 H21 V21 H9 Z" : "M3 4 H21 V20 H3 Z M12 4 V20");
+    private const string PinIcon="M9 3 H15 L14 9 L17 12 H7 L10 9 Z M12 12 V21";
+    // Pinned (docked beside other apps): upright, filled pin. Unpinned (drawer that hides on click-away): tilted outline pin.
+    private static UIElement ModeIcon(PanelMode mode) { var icon=(System.Windows.Shapes.Path)ToolbarIcon(PinIcon); if(mode==PanelMode.Overlay) icon.RenderTransform=new RotateTransform(45,7,7); else icon.Fill=Brushes.LightGray; return icon; }
     private void RebuildOverflow() {
         if(_overflowMenu is null) return;
         _overflowMenu.Items.Clear();
@@ -129,8 +131,7 @@ internal sealed partial class PanelWindow : Window
     public void RefreshControls(LauncherSetting setting, PanelMode? displayedMode = null) {
         _activeSetting=setting; _displayedMode=displayedMode;
         if(_deviceButton is not null) _deviceButton.IsEnabled=!HasActiveAuth;
-        if(_modeButton is not null) _modeButton.Content=(displayedMode ?? setting.Mode).ToString();
-        UpdateCompactToolbar();
+                UpdateCompactToolbar();
     }
     public void OfferExternalLink(Uri uri,Action action) { _outsideAction=action; _outsideLink.Content=$"Open {uri.IdnHost} in browser"; _outsideLink.Visibility=Visibility.Visible; SetStatus("An outside link was requested. It has not opened automatically."); }
     public void PromotePopup(AuthSurface surface,WebView2 view) { _popups.Remove(surface); surface.MarkPromoted(); _viewBoxes[view]=surface; if(_activeLauncher==surface.LauncherId) _activeView=view; RefreshVisibility(); }

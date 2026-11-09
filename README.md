@@ -9,7 +9,7 @@ Both names are candidates. The app alternates between them on purpose while the 
 - Built-in apps: Gmail A, Calendar A, Gmail B, Calendar B and SoundCloud. Gmail and Calendar share a login within one account; A and B stay separate. Added websites each get their own login storage.
 - One app is visible at a time. Hidden apps keep running. The panel's × only hides it; right-click an icon and choose **Close** to unload the app and stop its audio.
 - Click **+** at the bottom of the dock to add a website with a name, address and icon. Drag icons to reorder them.
-- The toolbar has back/forward, Open in browser, drawer or side-by-side placement, zoom (also Ctrl +, Ctrl −, Ctrl 0; click the percentage to reset), dark/light mode and Desktop/Mobile site. The sidebar always stays above other windows. Back, forward and reload move into a ⋯ menu when the panel is narrow. Drag the panel's right edge to resize it.
+- The toolbar has back/forward, Open in browser, a pushpin (pinned docks the panel beside your other apps; unpinned makes it a drawer that hides when you click away), zoom (also Ctrl +, Ctrl −, Ctrl 0; click the percentage to reset), dark/light mode and Desktop/Mobile site. The sidebar always stays above other windows. Back, forward and reload move into a ⋯ menu when the panel is narrow. Drag the panel's right edge to resize it.
 - The gear at the bottom holds the keyboard shortcut, Hide and Quit.
 
 Settings and logins are stored in `%LOCALAPPDATA%\SidebarPrototype`, outside this folder.
