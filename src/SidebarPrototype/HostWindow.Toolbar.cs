@@ -37,14 +37,6 @@ internal sealed partial class HostWindow
                 _panel.RefreshControls(s, _openMode);
                 _ = SaveAsync();
                 break;
-            case "top":
-                _settings.Topmost = !_settings.Topmost;
-                Topmost = _settings.Topmost;
-                _panel.Topmost = _settings.Topmost && !_shell.IsFullscreenActive;
-                _shell.SetTopmost(_settings.Topmost);
-                _panel.RefreshControls(s, _openMode);
-                _ = SaveAsync();
-                break;
             case "theme":
                 s.Theme = s.Theme == SiteTheme.Dark ? SiteTheme.Light : SiteTheme.Dark;
                 var profile = ConfiguredLaunchers.Single(x => x.Id == id).Profile;

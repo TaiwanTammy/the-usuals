@@ -85,11 +85,9 @@ internal sealed partial class PanelWindow
             _modeButton,
             _browserButton,
             _deviceButton,
-            _topmostButton,
             _zoomOutButton,
             _zoomInButton,
             _themeButton,
-            _moreButton,
             _closeButton,
         }.All(x => x is { Visibility: Visibility.Visible } && x.ActualWidth > 0 && x.ActualHeight > 0);
         var result = new

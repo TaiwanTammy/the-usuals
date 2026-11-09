@@ -80,7 +80,7 @@ internal sealed partial class HostWindow
                 Check($"toolbar{width:0}HasNoDuplicates",json.GetProperty("noDuplicates").GetBoolean());
                 var commands=json.GetProperty("commands").EnumerateArray().Select(x=>x.GetString()!).ToArray();
                 var overflow=json.GetProperty("overflowcommands").EnumerateArray().Select(x=>x.GetString()!).ToArray();
-                Check($"toolbar{width:0}RequiredActionsDirect",new[]{"mode","external","identity","top","zoom-","zoom+","theme","close"}.All(commands.Contains) && json.GetProperty("visibleControls").GetBoolean());
+                Check($"toolbar{width:0}RequiredActionsDirect",new[]{"mode","external","identity","zoom-","zoom0","zoom+","theme","close"}.All(commands.Contains) && json.GetProperty("visibleControls").GetBoolean());
                 Check($"toolbar{width:0}NavigationAvailableExactlyOnce",new[]{"back","forward","reload"}.All(x=>commands.Concat(overflow).Count(y=>y==x)==1));
                 var navCount=new[]{"back","forward","reload"}.Count(commands.Contains);
                 Check($"toolbar{width:0}PromotesActions",navCount>=previousNavCount && (width<800 || navCount==3)); previousNavCount=navCount;

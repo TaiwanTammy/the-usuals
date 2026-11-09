@@ -35,6 +35,7 @@ public sealed class AppSettings
     }
     public AppSettings Validate()
     {
+        Topmost = true; // The Always on Top button was removed; the sidebar always stays above other windows.
         DockWidth = double.IsFinite(DockWidth) ? Math.Clamp(DockWidth, 36, 240) : 45;
         if (ShortcutVirtualKey == 0 || (ShortcutModifiers & 0x000F) == 0) { ShortcutModifiers = 0x0001 | 0x0002 | 0x4000; ShortcutVirtualKey = 0x20; }
         if (!Enum.IsDefined<SidebarPrototype.BrandingMode>(BrandingMode)) BrandingMode = SidebarPrototype.BrandingMode.Rotate;

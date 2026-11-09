@@ -99,7 +99,7 @@ await Exercise("Configuration roundtrip preserves user choices", async () => {
     var cfg = new AppSettings { DockWidth = 144, Topmost = false, Launchers = new() { [gmail.Id] = new() { Mode = PanelMode.Split, Width = 450, Zoom = 1.3, Theme = SiteTheme.Light } } };
     await cfg.SaveAtomicAsync(file);
     var read = AppSettings.SafeLoad(file);
-    if (read.DockWidth != 144 || read.Topmost || read.Launchers[gmail.Id].Mode != PanelMode.Split || read.Launchers[gmail.Id].Zoom != 1.3) throw new Exception("Roundtrip mismatch");
+    if (read.DockWidth != 144 || !read.Topmost || read.Launchers[gmail.Id].Mode != PanelMode.Split || read.Launchers[gmail.Id].Zoom != 1.3) throw new Exception("Roundtrip mismatch");
 });
 await Exercise("Concurrent atomic saves leave a parseable complete document", async () => {
     var file = Path.Combine(root, "concurrent.json"); var cfg = new AppSettings();
