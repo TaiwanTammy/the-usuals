@@ -103,6 +103,7 @@ internal sealed partial class HostWindow : Window
         _hotkey.Pressed += (_, _) => OnGlobalHotkey();
         _environment = CoreWebView2Environment.CreateAsync(null, Path.Combine(_root, "browser-data"));
         BuildButtons();
+        StartChromeBridge();
         _focusWatch.Tick += (_, _) =>
         {
             if (
@@ -284,6 +285,7 @@ internal sealed partial class HostWindow : Window
         _shell.Release();
         _shell.Dispose();
         _tray.Dispose();
+        _chrome?.Dispose();
 #if TEST_HARNESS
         _fixtureServer?.Stop();
 #endif
