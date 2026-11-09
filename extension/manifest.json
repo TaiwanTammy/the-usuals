@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Sessions",
+  "version": "1.6.1",
+  "description": "One project's tabs at a time. Pinned tabs stay put.",
+  "minimum_chrome_version": "127",
+  "permissions": ["tabs", "storage", "unlimitedStorage", "favicon", "contextMenus", "history", "tabGroups", "nativeMessaging"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sessions (Alt+S)",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "options_page": "backup.html",
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+S" },
+      "description": "Open the session list"
+    },
+    "previous-session": {
+      "suggested_key": { "default": "Alt+Q" },
+      "description": "Go back to the last session you were in"
+    }
+  }
+}

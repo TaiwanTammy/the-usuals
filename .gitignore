@@ -6,3 +6,6 @@ app/
 toolchain/
 *.user
 *.suo
+
+# Personal session backup for the Sessions extension
+extension/import.json

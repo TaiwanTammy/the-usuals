@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sessions</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="sessionsView">
+    <div class="search">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M13 13l4 4"/></svg>
+      <input id="q" type="text" placeholder="Find a session or tab, or start a new one" autocomplete="off" spellcheck="false">
+    </div>
+    <p id="note" class="note" hidden></p>
+    <ul id="list" class="list"></ul>
+    <section class="pinned">
+      <div class="pinned-head">
+        <h2>Pinned sites</h2>
+        <button id="pin" class="link" type="button">Pin this tab</button>
+      </div>
+      <div id="pins" class="pins"></div>
+    </section>
+    <footer>
+      <span>Alt+S this menu · Alt+Q last session</span>
+      <button id="backup" class="link" type="button">Backup</button>
+    </footer>
+  </div>
+
+  <div id="sortView" hidden>
+    <header class="sort-head">
+      <button id="back" class="icon-btn" type="button" title="Back to sessions">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6"/></svg>
+      </button>
+      <div class="text">
+        <div class="name" id="sortName"></div>
+        <div class="meta" id="sortMeta"></div>
+      </div>
+      <button id="all" class="link" type="button">Select all</button>
+    </header>
+    <ul id="tabs" class="list tabs"></ul>
+    <section class="dest">
+      <div class="dest-label" id="destLabel"></div>
+      <input id="dq" class="dest-input" type="text" placeholder="Type a session name" autocomplete="off" spellcheck="false">
+      <ul id="dests" class="list dests"></ul>
+    </section>
+    <footer><span>Tip: right-click any tab and choose Move to session</span></footer>
+  </div>
+
+  <div id="ctx" class="ctx" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+  <script src="common.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

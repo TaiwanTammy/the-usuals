@@ -21,6 +21,7 @@ Read this file and `README.md` before editing. This is an existing Windows deskt
 - `Core.cs`: persisted settings, launchers/catalog, URL rules, sizing and visible-state generations.
 - `AuthenticationHost.cs`, `AuthSurface.cs`, `NavigationSession.cs`, `AppReturnPolicy.cs`: popup lifecycle, accepted redirects, app return, explicit external-browser routing and unload ownership.
 - `ChromeBridge.cs`: Chrome native messaging. Chrome launches this exe with a `chrome-extension://` argument; that copy only relays framed JSON between stdin/stdout and a current-user named pipe the running sidebar serves. Registers the host under HKCU for Chrome and Edge at every start, allowing installed extensions named Sessions that request `nativeMessaging`. `SessionsUi.cs`: the sessions button and panel, and adding a dock app sent from Chrome.
+- `extension/`: the Sessions Chrome extension (plain JS, Manifest V3, loaded unpacked). `extension/import.json` is a personal session backup, git-ignored; never commit it or screenshots showing real sessions.
 - `BrowserIdentity.cs`: user agent/client hints/mobile metrics.
 - `AppBranding.cs` / `AppBrandingHost.cs`: pure name selection and six-hour display rotation. `BrandingMode` defaults to `Rotate`; `TheUsuals` and `PaneInTheApps` are fixed-name modes for the eventual decision. `LastBrandIndex` persists the sequence. There is no name-selection settings UI yet; do not imply one exists.
 - `Shell/`: Windows AppBar reservation, DPI, hotkey and focus behavior.

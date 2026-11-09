@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title></title>
+<link id="icon" rel="icon">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; place-items: center; background: Canvas; color: CanvasText; font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 480px; padding: 16px; text-align: center; }
+  main[hidden] { display: none; }
+  h1 { margin: 0 0 4px; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+  p { margin: 0 0 16px; font-size: 13px; opacity: .65; overflow-wrap: anywhere; }
+  button { font: inherit; font-weight: 550; padding: 8px 16px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<main id="card" hidden>
+  <h1 id="title"></h1>
+  <p id="where"></p>
+  <button id="open" type="button">Open page</button>
+</main>
+<script src="common.js"></script>
+<script src="lazy.js"></script>
+</body>
+</html>
