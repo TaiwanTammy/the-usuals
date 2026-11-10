@@ -301,6 +301,8 @@ internal sealed partial class HostWindow
             QueueZoom(launcher.Id, next, view);
             e.Handled = true;
         };
+        if (launcher.Id.StartsWith("custom-", StringComparison.Ordinal))
+            core.FaviconChanged += async (_, _) => await SaveFaviconFromPageAsync(launcher.Id, core);
         core.WebMessageReceived += (_, e) =>
         {
             string? message;

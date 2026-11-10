@@ -60,7 +60,7 @@ internal sealed partial class HostWindow
     {
         try {
             var dir=Path.Combine(_root,"customsitefiles"); var icon=await TrySaveWebsiteFaviconAsync(definition.Id,definition.Url,dir).ConfigureAwait(false); if(icon is null)return;
-            await Dispatcher.InvokeAsync(()=>{ var current=_settings.CustomLaunchers.FirstOrDefault(x=>x.Id==definition.Id); if(current is not null) { current.IconPath=icon; RebuildLauncherButtons(); } });
+            await Dispatcher.InvokeAsync(()=>{ var current=_settings.CustomLaunchers.FirstOrDefault(x=>x.Id==definition.Id); if(current is { IconPath: null }) { current.IconPath=icon; RebuildLauncherButtons(); } });
             await SaveAsync().ConfigureAwait(false);
         } catch { }
     }
@@ -227,19 +227,75 @@ internal sealed partial class HostWindow
         var content=new FrameworkElementFactory(typeof(ItemsPresenter)); content.SetValue(ItemsPresenter.MarginProperty,new Thickness(2)); border.AppendChild(content); template.VisualTree=border; return template;
     }
 
+    // Sites list their icons in <link rel="...icon..."> tags; many have no /favicon.ico at all, so read the page first and keep /favicon.ico as the last try.
     private static async Task<string?> TrySaveWebsiteFaviconAsync(string id,string url,string directory)
     {
         try {
-            using var cts=new CancellationTokenSource(TimeSpan.FromSeconds(2)); using var client=new HttpClient { Timeout=TimeSpan.FromSeconds(2) };
-            var origin=new Uri(url).GetLeftPart(UriPartial.Authority); using var response=await client.GetAsync(origin+"/favicon.ico",HttpCompletionOption.ResponseHeadersRead,cts.Token);
-            if(!response.IsSuccessStatusCode || response.Content.Headers.ContentLength is > 1_000_000) return null;
-            await using var source=await response.Content.ReadAsStreamAsync(cts.Token); await using var buffer=new MemoryStream(); var chunk=new byte[8192];
-            while(true) { var read=await source.ReadAsync(chunk,cts.Token); if(read==0) break; if(buffer.Length+read>1_000_000)return null; await buffer.WriteAsync(chunk.AsMemory(0,read),cts.Token); }
-            var bytes=buffer.ToArray(); if(bytes.Length==0)return null;
-            Directory.CreateDirectory(directory); var path=id+".ico"; await File.WriteAllBytesAsync(Path.Combine(directory,path),bytes,cts.Token); return path;
-        } catch { return null; }
+            using var cts=new CancellationTokenSource(TimeSpan.FromSeconds(12)); using var client=new HttpClient { Timeout=TimeSpan.FromSeconds(12) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36");
+            var page=new Uri(url); var candidates=new List<Uri>();
+            try { if(await ReadLimitedAsync(client,page,400_000,true,cts.Token) is { } html) candidates.AddRange(IconLinks(System.Text.Encoding.UTF8.GetString(html),page)); } catch { }
+            candidates.Add(new Uri(page,"/favicon.ico"));
+            foreach(var candidate in candidates.Distinct()) {
+                if(candidate.Scheme!=Uri.UriSchemeHttps && candidate.Scheme!=Uri.UriSchemeHttp) continue;
+                byte[]? bytes; try { bytes=await ReadLimitedAsync(client,candidate,1_000_000,false,cts.Token); } catch { continue; }
+                if(bytes is null || ImageExtension(bytes) is not { } ext || !Decodes(bytes)) continue;
+                Directory.CreateDirectory(directory); var path=id+ext; await File.WriteAllBytesAsync(Path.Combine(directory,path),bytes,cts.Token); return path;
+            }
+        } catch { }
+        return null;
     }
 
+    private static async Task<byte[]?> ReadLimitedAsync(HttpClient client,Uri uri,int limit,bool truncate,CancellationToken token)
+    {
+        using var response=await client.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,token);
+        if(!response.IsSuccessStatusCode || (!truncate && response.Content.Headers.ContentLength>limit)) return null;
+        await using var source=await response.Content.ReadAsStreamAsync(token); using var buffer=new MemoryStream(); var chunk=new byte[8192];
+        while(true) { var read=await source.ReadAsync(chunk,token); if(read==0) break; if(buffer.Length+read>limit) { if(!truncate) return null; buffer.Write(chunk,0,(int)(limit-buffer.Length)); break; } buffer.Write(chunk,0,read); }
+        return buffer.Length==0 ? null : buffer.ToArray();
+    }
+
+    internal static IEnumerable<Uri> IconLinks(string html,Uri page)
+    {
+        var found=new List<(int Rank,int Size,Uri Uri)>();
+        foreach(System.Text.RegularExpressions.Match tag in System.Text.RegularExpressions.Regex.Matches(html,@"<link\b[^>]*>",System.Text.RegularExpressions.RegexOptions.IgnoreCase)) {
+            var attrs=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+            foreach(System.Text.RegularExpressions.Match a in System.Text.RegularExpressions.Regex.Matches(tag.Value,@"([\w-]+)\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))"))
+                attrs[a.Groups[1].Value]=System.Net.WebUtility.HtmlDecode(a.Groups[2].Success?a.Groups[2].Value:a.Groups[3].Success?a.Groups[3].Value:a.Groups[4].Value);
+            if(!attrs.TryGetValue("rel",out var rel) || !attrs.TryGetValue("href",out var href) || !rel.Contains("icon",StringComparison.OrdinalIgnoreCase)) continue;
+            if((attrs.TryGetValue("type",out var type) && type.Contains("svg",StringComparison.OrdinalIgnoreCase)) || href.Split('?')[0].EndsWith(".svg",StringComparison.OrdinalIgnoreCase) || rel.Contains("mask",StringComparison.OrdinalIgnoreCase)) continue;
+            if(!Uri.TryCreate(page,href,out var uri)) continue;
+            var size=attrs.TryGetValue("sizes",out var sizes) ? sizes.Split(' ',StringSplitOptions.RemoveEmptyEntries).Select(s=>int.TryParse(s.Split('x','X')[0],out var n)?n:0).DefaultIfEmpty(0).Max() : 0;
+            found.Add((rel.Contains("apple-touch",StringComparison.OrdinalIgnoreCase)?0:1,size,uri));
+        }
+        return found.OrderBy(x=>x.Rank).ThenByDescending(x=>x.Size).Select(x=>x.Uri);
+    }
+
+    private static string? ImageExtension(byte[] b) =>
+        b.Length<4 ? null
+        : b[0]==0x89&&b[1]==0x50&&b[2]==0x4E&&b[3]==0x47 ? ".png"
+        : b[0]==0&&b[1]==0&&b[2]==1&&b[3]==0 ? ".ico"
+        : b[0]==0xFF&&b[1]==0xD8&&b[2]==0xFF ? ".jpg"
+        : b[0]==(byte)'B'&&b[1]==(byte)'M' ? ".bmp"
+        : null;
+
+    private static bool Decodes(byte[] bytes)
+    {
+        try { var frame=BitmapDecoder.Create(new MemoryStream(bytes),BitmapCreateOptions.None,BitmapCacheOption.OnLoad).Frames[0]; return frame.PixelWidth>0 && frame.PixelHeight>0; } catch { return false; }
+    }
+
+    // Fallback for sites whose icon only appears once the page has loaded (or sits behind a sign-in): take it from the page itself.
+    internal async Task SaveFaviconFromPageAsync(string id,Microsoft.Web.WebView2.Core.CoreWebView2 core)
+    {
+        try {
+            if(_settings.CustomLaunchers.FirstOrDefault(x=>x.Id==id) is not { IconPath: null } definition) return;
+            using var stream=await core.GetFaviconAsync(Microsoft.Web.WebView2.Core.CoreWebView2FaviconImageFormat.Png);
+            if(stream is null) return; using var buffer=new MemoryStream(); await stream.CopyToAsync(buffer); var bytes=buffer.ToArray();
+            if(bytes.Length is 0 or > 1_000_000 || !Decodes(bytes) || definition.IconPath is not null || !_settings.CustomLaunchers.Contains(definition)) return;
+            var dir=Path.Combine(_root,"customsitefiles"); Directory.CreateDirectory(dir); var path=id+".png"; await File.WriteAllBytesAsync(Path.Combine(dir,path),bytes);
+            definition.IconPath=path; RebuildLauncherButtons(); await SaveAsync();
+        } catch { }
+    }
     internal object? CaptureDock(string path) => CaptureElement(_dock,path);
     private static object? CaptureElement(FrameworkElement element,string path)
     {

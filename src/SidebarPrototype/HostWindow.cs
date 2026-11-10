@@ -103,6 +103,9 @@ internal sealed partial class HostWindow : Window
         _hotkey.Pressed += (_, _) => OnGlobalHotkey();
         _environment = CoreWebView2Environment.CreateAsync(null, Path.Combine(_root, "browser-data"));
         BuildButtons();
+        if (!_options.Fixture)
+            foreach (var added in _settings.CustomLaunchers.Where(x => x.IconPath is null).ToList())
+                _ = LoadFaviconAfterAddAsync(added);
         StartChromeBridge();
         _focusWatch.Tick += (_, _) =>
         {

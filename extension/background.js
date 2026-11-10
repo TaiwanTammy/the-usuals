@@ -695,7 +695,7 @@ async function buildMenus() {
   const others = (await allSessions())
     .filter((s) => s.id !== m.currentId)
     .sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0));
-  const sig = JSON.stringify([2, usualsName, others.map((s) => [s.id, s.name])]); // bump the first number when the menu's layout changes
+  const sig = JSON.stringify([3, usualsName, others.map((s) => [s.id, s.name])]); // bump the first number when the menu's layout changes
   if ((await chrome.storage.session.get('menuSig')).menuSig === sig) return;
   await chrome.storage.session.set({ menuSig: sig });
 
@@ -716,7 +716,8 @@ async function buildMenus() {
     for (const s of others) add({ id: `to|${ctx}|${s.id}`, parentId: root, title: label(s.name), contexts: [ctx] });
     add({ id: `new|${ctx}`, parentId: root, title: 'New session…', contexts: [ctx] });
     if (usualsName) {
-      add({ id: `sepu|${ctx}`, parentId: root, type: 'separator', contexts: [ctx] });
+      // Chrome leaves real separators out of this tab submenu, so the divider is a greyed-out line item instead.
+      add({ id: `sepu|${ctx}`, parentId: root, title: '──────────', enabled: false, contexts: [ctx] });
       add({ id: `usuals|${ctx}`, parentId: root, title: 'Pin to sidebar', contexts: [ctx] });
     }
   }

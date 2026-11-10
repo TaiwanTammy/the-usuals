@@ -71,4 +71,6 @@ internal static class NativeMethods
     [DllImport("user32.dll", EntryPoint = "GetDpiForWindow")] internal static extern uint GetDpiForWindow(nint hwnd);
     [DllImport("shcore.dll", EntryPoint = "GetDpiForMonitor")] internal static extern int GetDpiForMonitor(nint monitor, int dpiType, out uint dpiX, out uint dpiY);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern uint RegisterWindowMessage(string name);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool ReleaseCapture();
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")] internal static extern nint SendMessage(nint hwnd, uint message, nint wParam, nint lParam);
 }
