@@ -18,7 +18,7 @@ public static class AppReturnPolicy
     }
     public static bool IsAppReturn(Launcher app,string? source,bool waitingForSignIn,Uri? fixture = null)
     {
-        if(!waitingForSignIn || !IsGoogle(app) || !UrlPolicy.TryParseHttp(source,out var uri)) return false;
+        if(!waitingForSignIn || !(IsGoogle(app) || UrlPolicy.IsCustom(app)) || !UrlPolicy.TryParseHttp(source,out var uri)) return false;
         if(fixture is not null) return uri!.Host==fixture.Host && uri.Port==fixture.Port && uri.AbsolutePath=="/app-return";
         return uri!.Scheme=="https" && uri.IdnHost.Equals(app.StartUri.IdnHost,StringComparison.OrdinalIgnoreCase) && UrlPolicy.IsAllowedRestore(source,app);
     }

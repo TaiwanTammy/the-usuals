@@ -107,6 +107,23 @@ internal sealed partial class HostWindow : Window
             foreach (var added in _settings.CustomLaunchers.Where(x => x.IconPath is null).ToList())
                 _ = LoadFaviconAfterAddAsync(added);
         StartChromeBridge();
+#if !TEST_HARNESS
+        // Start with Windows. Rewritten at every start so a moved app folder fixes itself; turning it off in
+        // Windows' Startup apps settings is still respected, because Windows keeps that switch separately.
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (Environment.ProcessPath is not { } exe)
+                    return;
+                using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Run"
+                );
+                run.SetValue("SidebarPrototype", $"\"{exe}\"");
+            }
+            catch { }
+        });
+#endif
         _focusWatch.Tick += (_, _) =>
         {
             if (

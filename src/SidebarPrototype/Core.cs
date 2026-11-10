@@ -122,7 +122,29 @@ public static class UrlPolicy
             (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps) || string.IsNullOrWhiteSpace(parsed.Host)) return false;
         uri = parsed; return true;
     }
+    // Added apps keep their sign-in in the panel: Chrome has its own cookies, so a sign-in finished there never signs the panel in.
+    private static readonly string[] SignInHosts = ["accounts.google.com", "login.microsoftonline.com", "login.live.com", "appleid.apple.com"];
+    public static bool IsSignInProvider(Uri uri)
+    {
+        if (uri.Scheme != Uri.UriSchemeHttps) return false;
+        if (SignInHosts.Contains(uri.IdnHost, StringComparer.OrdinalIgnoreCase) || IsGoogleAuthPopup(uri)) return true;
+        var path = uri.AbsolutePath;
+        return uri.IdnHost.Equals("github.com", StringComparison.OrdinalIgnoreCase) &&
+            (path.Equals("/login", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/login/", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/session", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/sessions/", StringComparison.OrdinalIgnoreCase));
+    }
+    // "backboard.railway.com" and "railway.com" are one site; "shop.example.co.uk" belongs to "example.co.uk".
+    public static bool IsSameSite(Uri uri, Uri start) => SiteOf(uri.IdnHost) is { Length: > 0 } site && site.Equals(SiteOf(start.IdnHost), StringComparison.OrdinalIgnoreCase);
+    private static string SiteOf(string host)
+    {
+        var parts = host.Split('.');
+        if (parts.Length < 2) return host;
+        var keep = parts.Length >= 3 && parts[^1].Length == 2 && parts[^2].Length <= 3 ? 3 : 2;
+        return string.Join('.', parts[^keep..]);
+    }
+    public static bool IsCustom(Launcher launcher) => launcher.Id.StartsWith("custom-", StringComparison.Ordinal);
     public static bool IsInternal(Uri uri, Launcher launcher) => uri.IdnHost.Equals(launcher.StartUri.IdnHost, StringComparison.OrdinalIgnoreCase) ||
+        (IsCustom(launcher) && uri.Scheme == Uri.UriSchemeHttps && (IsSameSite(uri, launcher.StartUri) || IsSignInProvider(uri))) ||
         (launcher.Profile == "SoundCloud" && uri.Scheme == Uri.UriSchemeHttps && uri.IdnHost.Equals("secure.soundcloud.com", StringComparison.OrdinalIgnoreCase)) ||
         ((launcher.Profile is "AccountA" or "AccountB") && IsGoogleAccountRoute(uri));
 

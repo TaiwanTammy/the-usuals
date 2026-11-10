@@ -27,6 +27,14 @@ Check("Google sign-in intent requires exact HTTPS account host",!AppReturnPolicy
 Check("Signed-in Calendar return promotes only when waiting",AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com/calendar/u/0/r",true) && !AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com/calendar/u/0/r",false));
 Check("Other app cannot be promoted into Calendar",!AppReturnPolicy.IsAppReturn(calendar,"https://mail.google.com/mail/u/0/",true));
 Check("Auth callback is not mistaken for app document",!AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com/oauth/callback?code=x",true));
+var railway=new Launcher("custom-test","Railway","Custom-test",new Uri("https://railway.com/"));
+Check("Added app keeps Google sign-in in the panel",UrlPolicy.ShouldEmbedPopup(new Uri("https://accounts.google.com/o/oauth2/v2/auth?client_id=x"),railway) && UrlPolicy.ShouldEmbed(new Uri("https://accounts.google.com/signin/v2/identifier"),railway));
+Check("Added app keeps GitHub and Microsoft sign-in in the panel",UrlPolicy.ShouldEmbedPopup(new Uri("https://github.com/login/oauth/authorize?client_id=x"),railway) && UrlPolicy.ShouldEmbedPopup(new Uri("https://login.microsoftonline.com/common/oauth2/v2.0/authorize"),railway));
+Check("Added app treats its own subdomains as the same site",UrlPolicy.ShouldEmbed(new Uri("https://backboard.railway.com/auth/google"),railway) && !UrlPolicy.ShouldEmbed(new Uri("https://railway.com.evil.test/"),railway));
+Check("Added app still sends ordinary outside links to the browser",!UrlPolicy.ShouldEmbed(new Uri("https://github.com/railwayapp/cli"),railway) && !UrlPolicy.ShouldEmbed(new Uri("https://docs.example.com/"),railway));
+Check("Added app sign-in rule is HTTPS only",!UrlPolicy.ShouldEmbedPopup(new Uri("http://accounts.google.com/signin"),railway));
+Check("Built-in app does not inherit the added-app sign-in rule",!UrlPolicy.ShouldEmbed(new Uri("https://github.com/login"),soundcloud));
+Check("Added app returns from sign-in only to a clean page on its own site",AppReturnPolicy.IsAppReturn(railway,"https://railway.com/dashboard",true) && !AppReturnPolicy.IsAppReturn(railway,"https://railway.com/dashboard",false) && !AppReturnPolicy.IsAppReturn(railway,"https://railway.com/oauth/callback?code=x",true));
 Check("SoundCloud opener callback never promoted as Google app",!AppReturnPolicy.IsAppReturn(soundcloud,"https://soundcloud.com/",true));
 Check("Untrusted app-origin lookalike not promoted",!AppReturnPolicy.IsAppReturn(calendar,"https://calendar.google.com.evil.test/",true));
 var normalFlow = new NavigationSession(gmail);

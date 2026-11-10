@@ -139,12 +139,14 @@ internal sealed partial class HostWindow
         e.Handled=true;
         var epoch=AppEpoch(app.Id);
         if(!IsAppEpochCurrent(app.Id,epoch)) return;
-        var googleAuthIntent=UrlPolicy.TryParseHttp(e.Uri,out var initialTarget) && AppReturnPolicy.IsGoogleSignInIntent(initialTarget!) ||
+        var googleAuthIntent=UrlPolicy.TryParseHttp(e.Uri,out var initialTarget) && (AppReturnPolicy.IsGoogleSignInIntent(initialTarget!) || UrlPolicy.IsCustom(app) && UrlPolicy.IsSignInProvider(initialTarget!)) ||
             _options.Fixture && Uri.TryCreate(e.Uri,UriKind.Absolute,out var fixtureTarget) && fixtureTarget!.IsLoopback && fixtureTarget.Port==new Uri(_fixtureBase!).Port && fixtureTarget.AbsolutePath=="/google-auth-intent";
         if(!UrlPolicy.IsPopupBootstrap(e.Uri)) {
             if(!UrlPolicy.TryParseHttp(e.Uri,out var uri)) return;
             var auth=_navigationSessions.TryGetValue(app.Id,out var session) && session.AuthenticationActive;
-            if(!ownedContext && !auth && !UrlPolicy.ShouldEmbedPopup(uri!,app,_options.Fixture ? new Uri(_fixtureBase!) : null)) { OpenExternal(uri!); return; }
+            // A sized window opened by script is a sign-in pop-up on nearly every site; for added apps it stays in the panel whatever provider it uses.
+            var sizedPopup=UrlPolicy.IsCustom(app) && e.WindowFeatures is { } features && (features.HasSize || features.HasPosition);
+            if(!ownedContext && !auth && !sizedPopup && !UrlPolicy.ShouldEmbedPopup(uri!,app,_options.Fixture ? new Uri(_fixtureBase!) : null)) { OpenExternal(uri!); return; }
             if(uri!.Scheme!="https" && !(_options.Fixture && uri.IsLoopback && uri.Port==new Uri(_fixtureBase!).Port)) return;
         }
         var deferral=e.GetDeferral();
@@ -172,6 +174,7 @@ internal sealed partial class HostWindow
             if(AppReturnPolicy.IsGoogle(app) && (UrlPolicy.TryParseHttp(e.Uri,out var intentUri) && AppReturnPolicy.IsGoogleSignInIntent(intentUri!) ||
                 _options.Fixture && Uri.TryCreate(e.Uri,UriKind.Absolute,out var fixtureIntent) && fixtureIntent!.IsLoopback && fixtureIntent.Port==new Uri(_fixtureBase!).Port && fixtureIntent.AbsolutePath=="/google-auth-intent"))
                 waitingForSignIn=true;
+            if(UrlPolicy.IsCustom(app) && UrlPolicy.TryParseHttp(e.Uri,out var providerUri) && UrlPolicy.IsSignInProvider(providerUri!)) waitingForSignIn=true;
             var decision=navigation.Decide(e.Uri,e.NavigationId,e.IsRedirected,e.IsUserInitiated); e.Cancel=decision!=NavigationDecision.Embed;
             ObserveNavigation(app.Id,true,e.Uri,decision,e.IsRedirected,e.IsUserInitiated);
             surface.SetLocation(e.Uri,e.Cancel ? "Unsupported sign-in navigation was blocked." : "Loading…");
