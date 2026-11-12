@@ -62,6 +62,20 @@ internal sealed partial class HostWindow
             case "identity":
                 _ = ToggleIdentityAsync(id, v);
                 break;
+            case "copy":
+                if (UrlPolicy.TryParseHttp(v.Source?.AbsoluteUri, out var page))
+                {
+                    try
+                    {
+                        System.Windows.Clipboard.SetText(page!.AbsoluteUri);
+                        _panel.SetStatus("Address copied");
+                    }
+                    catch
+                    {
+                        _panel.SetStatus("Could not copy the address. Please try again.");
+                    }
+                }
+                break;
             case "external":
                 if (_panel.HasActiveAuth)
                 {
@@ -75,6 +89,11 @@ internal sealed partial class HostWindow
         if (action.StartsWith("zoom"))
             RecordInteraction(id, "zoom-command", commandStarted);
     }
+
+    internal string? ActivePageAddress() =>
+        _state.ActiveId is { } id && _views.TryGetValue(id, out var v) && UrlPolicy.TryParseHttp((_panel.ActiveAuthView(id) ?? v).Source?.AbsoluteUri, out var page)
+            ? page!.AbsoluteUri
+            : null;
 
     private readonly HashSet<string> _identityChanges = [];
 

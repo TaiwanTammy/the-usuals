@@ -203,6 +203,63 @@ internal sealed partial class HostWindow
         try { LauncherCatalog.NormalizeUrl(text); return true; } catch { return false; }
     }
 
+    // ---- Edit an added app ----
+
+    private Popup? _editFlyout;
+
+    private void OpenEditApp(Launcher app, UIElement target)
+    {
+        if (_settings.CustomLaunchers.FirstOrDefault(x => x.Id == app.Id) is not { } definition) return;
+        _editFlyout ??= CreateFlyout(target, 300);
+        _editFlyout.PlacementTarget = target;
+        var list = new StackPanel();
+        list.Children.Add(FlyoutHeading("Edit app"));
+        var (urlField, url) = FlyoutTextBox("Website address");
+        var (nameField, name) = FlyoutTextBox("Name");
+        url.Text = definition.Url; name.Text = definition.Label;
+        list.Children.Add(urlField); list.Children.Add(nameField);
+        // Browse to the page you want first, then one click makes it the app's address.
+        if (_views.TryGetValue(app.Id, out var view) && view.Source?.AbsoluteUri is { } open && UrlPolicy.IsSafeRestorable(open) && open != definition.Url)
+            list.Children.Add(FlyoutRow("Use the page open now", null, () => { url.Text = open; url.CaretIndex = open.Length; url.Focus(); }));
+        var error = new TextBlock { Foreground = new SolidColorBrush(Color.FromRgb(255, 150, 150)), FontSize = 12, Margin = new Thickness(6, 0, 6, 6), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        list.Children.Add(error);
+        var save = new WpfButton { Content = "Save", Width = 64, Height = 28, Margin = new Thickness(4, 0, 4, 2), HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Style = FlatButtonStyle, Foreground = Brushes.White, Background = BrushFor(58), BorderBrush = Brushes.Transparent, FontSize = 12 };
+        AutomationProperties.SetName(save, "Save");
+        list.Children.Add(save);
+        void Submit()
+        {
+            if (TryEditLauncher(app.Id, name.Text, url.Text, out var message)) _editFlyout!.IsOpen = false;
+            else { error.Text = message; error.Visibility = Visibility.Visible; }
+        }
+        save.Click += (_, _) => Submit();
+        System.Windows.Input.KeyEventHandler keys = (_, e) => { if (e.Key == Key.Enter) { Submit(); e.Handled = true; } else if (e.Key == Key.Escape) { _editFlyout!.IsOpen = false; e.Handled = true; } };
+        url.KeyDown += keys; name.KeyDown += keys;
+        SetFlyoutContent(_editFlyout, list);
+        _editFlyout.IsOpen = true;
+        if (!_options.UiTest) Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { Activate(); url.Focus(); Keyboard.Focus(url); url.SelectAll(); });
+    }
+
+    // Same app, same sign-in storage, new address. A changed address reloads the app there.
+    internal bool TryEditLauncher(string id, string name, string url, out string? error)
+    {
+        error = null;
+        try
+        {
+            var definition = _settings.CustomLaunchers.FirstOrDefault(x => x.Id == id) ?? throw new InvalidOperationException("This app is no longer in the sidebar.");
+            if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 48) throw new FormatException("Enter a name of 1 to 48 characters.");
+            var normalized = LauncherCatalog.NormalizeUrl(url);
+            var moved = normalized != definition.Url;
+            var wasOpen = _state.IsVisible && _state.ActiveId == id;
+            if (moved && ConfiguredLaunchers.FirstOrDefault(x => x.Id == id) is { } old) UnloadLauncher(old);
+            definition.Label = name.Trim(); definition.Url = normalized;
+            if (moved) GetSetting(id).LastUrl = null;
+            RefreshConfiguredLaunchers(); RebuildLauncherButtons(); _ = SaveAsync();
+            if (moved && wasOpen && ConfiguredLaunchers.FirstOrDefault(x => x.Id == id) is { } updated) _ = ActivateFromDockAsync(updated);
+            return true;
+        }
+        catch (Exception e) { error = e.Message; return false; }
+    }
+
     // ---- Remove / put back ----
 
     // Takes an app off the dock. Browser data is never deleted; built-in apps come back from the + panel still

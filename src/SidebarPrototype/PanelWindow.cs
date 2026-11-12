@@ -74,7 +74,10 @@ internal sealed partial class PanelWindow : Window
         var mode=AddPath(PinIcon,"mode","Pin panel",24); _modeButton=mode;
         _browserButton=AddPath("M14 3 H21 V10 M21 3 L11 13 M18 13 V20 H4 V6 H11","external","Open in browser",24);
         _closeButton=AddPath("M6 6 L18 18 M18 6 L6 18","close","Hide panel and keep this app loaded. Right-click its sidebar icon to close the app.",24);
-        var windowGroup=Group(5,mode,_browserButton,_closeButton); ((FrameworkElement)windowGroup.Parent).Margin=new Thickness(2,0,4,0);
+        // Hover shows the page's address; click copies it.
+        var copy=AddPath("M9 9 H20 V20 H9 Z M15 5 V4 H4 V15 H5","copy","Copy address",24);
+        copy.ToolTipOpening+=(_,_)=>copy.ToolTip=_host.ActivePageAddress() is { } address ? "Copy address\n"+address : "Copy address";
+        var windowGroup=Group(5,mode,copy,_browserButton,_closeButton); ((FrameworkElement)windowGroup.Parent).Margin=new Thickness(2,0,4,0);
         RebuildOverflow();
         _toolbar=bar; bar.SizeChanged+=(_,_)=>UpdateCompactToolbar(); bar.Loaded+=(_,_)=>UpdateCompactToolbar();
         DockPanel.SetDock(bar, Dock.Top); _root.Children.Add(bar); DockPanel.SetDock(_outsideLink,Dock.Top); _root.Children.Add(_outsideLink);
@@ -89,7 +92,7 @@ internal sealed partial class PanelWindow : Window
         if(_toolbar is null) return;
         var available=_toolbar.ActualWidth;
         // Title letter, page group, window group and gaps; each navigation button adds 28, the ⋯ button 28.
-        const double required=266;
+        const double required=290;
         var nav=new[]{_backButton,_forwardButton,_reloadButton};
         var shown=Enumerable.Range(0,4).Reverse().First(n=>n==0 || available>=required+n*28+(n<3 ? 28 : 0)+(n==3 ? 80 : 0));
         for(var i=0;i<nav.Length;i++) if(nav[i] is not null) nav[i]!.Visibility=i<shown ? Visibility.Visible : Visibility.Collapsed;

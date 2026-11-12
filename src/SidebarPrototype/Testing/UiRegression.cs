@@ -80,7 +80,7 @@ internal sealed partial class HostWindow
                 Check($"toolbar{width:0}HasNoDuplicates",json.GetProperty("noDuplicates").GetBoolean());
                 var commands=json.GetProperty("commands").EnumerateArray().Select(x=>x.GetString()!).ToArray();
                 var overflow=json.GetProperty("overflowcommands").EnumerateArray().Select(x=>x.GetString()!).ToArray();
-                Check($"toolbar{width:0}RequiredActionsDirect",new[]{"mode","external","identity","zoom-","zoom0","zoom+","theme","close"}.All(commands.Contains) && json.GetProperty("visibleControls").GetBoolean());
+                Check($"toolbar{width:0}RequiredActionsDirect",new[]{"mode","external","identity","zoom-","zoom0","zoom+","theme","copy","close"}.All(commands.Contains) && json.GetProperty("visibleControls").GetBoolean());
                 Check($"toolbar{width:0}NavigationAvailableExactlyOnce",new[]{"back","forward","reload"}.All(x=>commands.Concat(overflow).Count(y=>y==x)==1));
                 var navCount=new[]{"back","forward","reload"}.Count(commands.Contains);
                 Check($"toolbar{width:0}PromotesActions",navCount>=previousNavCount && (width<800 || navCount==3)); previousNavCount=navCount;
@@ -149,6 +149,10 @@ internal sealed partial class HostWindow
             var restored=LauncherCatalog.For(loaded);
             Check("customAppsAndOrderSurviveSettingsReload",restored.Select(x=>x.Id).SequenceEqual(requested) && restored.Single(x=>x.Id==firstCustom.Id).Profile==firstCustom.Profile && restored.Single(x=>x.Id==secondCustom.Id).StartUri==secondCustom.StartUri);
             Check("builtInAccountProfilesPreserved",original.All(x=>restored.Single(y=>y.Id==x.Id).Profile==x.Profile));
+            var editedOk=TryEditLauncher(firstCustom.Id,"Research edited","https://example.test/project/42",out var editError);
+            var edited=ConfiguredLaunchers.Single(x=>x.Id==firstCustom.Id);
+            Check("editedAppKeepsItsSignInStorage",editedOk && edited.Profile==firstCustom.Profile && edited.Label=="Research edited" && edited.StartUri.AbsoluteUri=="https://example.test/project/42" && GetSetting(firstCustom.Id).LastUrl is null,editError);
+            Check("editRejectsUnsafeAddress",!TryEditLauncher(firstCustom.Id,"Research edited","javascript:alert(1)",out _) && ConfiguredLaunchers.Single(x=>x.Id==firstCustom.Id).StartUri.AbsoluteUri=="https://example.test/project/42");
             RemoveLauncherForTest(firstCustom.Id);
             Check("removedCustomAppIsGone",ConfiguredLaunchers.All(x=>x.Id!=firstCustom.Id) && _settings.CustomLaunchers.All(x=>x.Id!=firstCustom.Id) && !_views.ContainsKey(firstCustom.Id));
             var malformedFile=Path.Combine(_root,"malformed-custom-settings.json");
