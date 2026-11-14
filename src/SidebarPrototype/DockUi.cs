@@ -98,6 +98,7 @@ internal sealed partial class HostWindow
         _dock.Children.Add(scroll); _dock.Children.Add(_bottomButtons);
         RebuildLauncherButtons();
 
+        AddDeployButton();
         _bottomButtons.Children.Add(CreateAddButton());
         AddSessionsButton();
         _bottomButtons.Children.Add(CreateSettingsButton());

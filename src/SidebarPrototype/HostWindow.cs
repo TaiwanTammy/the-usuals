@@ -341,6 +341,7 @@ internal sealed partial class HostWindow : Window
         _shell.Dispose();
         _tray.Dispose();
         _chrome?.Dispose();
+        StopDeployWatch();
 #if TEST_HARNESS
         _fixtureServer?.Stop();
 #endif
