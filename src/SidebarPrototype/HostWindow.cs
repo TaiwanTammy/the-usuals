@@ -120,6 +120,20 @@ internal sealed partial class HostWindow : Window
                     @"Software\Microsoft\Windows\CurrentVersion\Run"
                 );
                 run.SetValue("SidebarPrototype", $"\"{exe}\"");
+                // A Start menu entry, so typing "usuals" in Start finds it.
+                var link = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+                    AppBranding.TheUsuals + ".lnk"
+                );
+                if (Type.GetTypeFromProgID("WScript.Shell") is { } shellType)
+                {
+                    dynamic shell = Activator.CreateInstance(shellType)!;
+                    var shortcut = shell.CreateShortcut(link);
+                    shortcut.TargetPath = exe;
+                    shortcut.WorkingDirectory = Path.GetDirectoryName(exe);
+                    shortcut.Description = AppBranding.TheUsuals + " sidebar (" + AppBranding.PaneInTheApps + ")";
+                    shortcut.Save();
+                }
             }
             catch { }
         });
