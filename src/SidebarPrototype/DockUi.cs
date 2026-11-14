@@ -142,7 +142,7 @@ internal sealed partial class HostWindow
         var button = new WpfButton { Content=icon, Tag=launcher.Id, Height=46, Margin=new Thickness(0,1,0,1), Foreground=Brushes.White, Background=Brushes.Transparent, BorderBrush=Brushes.Transparent, Style=FlatButtonStyle, ToolTip=launcher.Label, Focusable=true };
         button.SetValue(IsDockActiveProperty,_state.ActiveId==launcher.Id);
         AutomationProperties.SetName(button, launcher.Label);
-        var appMenu = CreateFlatMenu(); var unload = NewMenuItem("Close"); unload.ToolTip="Unload this app from memory; account sign-in stays saved."; unload.Click += (_, _) => UnloadLauncher(launcher); appMenu.Items.Add(unload); if (UrlPolicy.IsCustom(launcher)) { var edit = NewMenuItem("Edit app"); edit.Click += (_, _) => OpenEditApp(launcher, button); appMenu.Items.Add(edit); } var remove = NewMenuItem("Remove from sidebar"); remove.Click += (_, _) => RemoveLauncher(launcher); appMenu.Items.Add(remove); button.ContextMenu=appMenu;
+        var appMenu = CreateFlatMenu(); var unload = NewMenuItem("Close"); unload.ToolTip="Unload this app from memory; account sign-in stays saved."; unload.Click += (_, _) => UnloadLauncher(launcher); appMenu.Items.Add(unload); if (UrlPolicy.IsCustom(launcher)) { var edit = NewMenuItem("Edit app"); edit.Click += (_, _) => OpenEditApp(launcher, button); appMenu.Items.Add(edit); var changeIcon = NewMenuItem("Change icon"); changeIcon.Click += (_, _) => ChangeIcon(launcher); appMenu.Items.Add(changeIcon); } var remove = NewMenuItem("Remove from sidebar"); remove.Click += (_, _) => RemoveLauncher(launcher); appMenu.Items.Add(remove); button.ContextMenu=appMenu;
         button.MouseEnter += (_, _) => imageColor.Opacity = 1;
         button.MouseLeave += (_, _) => imageColor.Opacity = 0;
         button.Click += async (_, _) => { if(_suppressDockClick)return; await ActivateFromDockAsync(launcher); };
@@ -285,16 +285,67 @@ internal sealed partial class HostWindow
         try { var frame=BitmapDecoder.Create(new MemoryStream(bytes),BitmapCreateOptions.None,BitmapCacheOption.OnLoad).Frames[0]; return frame.PixelWidth>0 && frame.PixelHeight>0; } catch { return false; }
     }
 
-    // Fallback for sites whose icon only appears once the page has loaded (or sits behind a sign-in): take it from the page itself.
+    private static int PixelWidth(byte[] bytes)
+    {
+        try { return BitmapDecoder.Create(new MemoryStream(bytes),BitmapCreateOptions.None,BitmapCacheOption.OnLoad).Frames.Max(f=>f.PixelWidth); } catch { return 0; }
+    }
+
+    private bool IconIsChosen(CustomLauncherDefinition d) => d.IconPath is { } p && p.Contains("-chosen",StringComparison.Ordinal);
+
+    private void StoreIcon(CustomLauncherDefinition d,byte[] bytes,string ext,bool chosen)
+    {
+        var dir=Path.Combine(_root,"customsitefiles"); Directory.CreateDirectory(dir);
+        var name=d.Id+(chosen?"-chosen":"")+"-"+DateTime.UtcNow.Ticks+ext; File.WriteAllBytes(Path.Combine(dir,name),bytes);
+        if(d.IconPath is { } old && Path.GetFileName(old)==old) try { File.Delete(Path.Combine(dir,old)); } catch { }
+        d.IconPath=name; RebuildLauncherButtons(); _=SaveAsync();
+    }
+
+    // Right-click > Change icon: pick any picture; it is never replaced by the automatic icon lookup afterwards.
+    private void ChangeIcon(Launcher launcher)
+    {
+        if(_settings.CustomLaunchers.FirstOrDefault(x=>x.Id==launcher.Id) is not { } definition) return;
+        var picker=new Microsoft.Win32.OpenFileDialog { Title="Choose an app icon", Filter="Images|*.png;*.jpg;*.jpeg;*.ico;*.bmp" };
+        if(picker.ShowDialog()!=true) return;
+        try {
+            var info=new FileInfo(picker.FileName); if(info.Length is 0 or > 2_000_000) { _panel.SetStatus("That picture is too large"); return; }
+            var bytes=File.ReadAllBytes(picker.FileName);
+            if(ImageExtension(bytes) is not { } ext || !Decodes(bytes)) { _panel.SetStatus("That file is not a picture"); return; }
+            StoreIcon(definition,bytes,ext,true);
+        } catch { _panel.SetStatus("Could not use that picture"); }
+    }
+
+    // Sites behind a sign-in hide their good icons from a plain download, so read the open page: its icon links and its web app manifest,
+    // take the largest one, and only replace the saved icon when the new one has more pixels. A picture chosen by hand is never touched.
     internal async Task SaveFaviconFromPageAsync(string id,Microsoft.Web.WebView2.Core.CoreWebView2 core)
     {
         try {
-            if(_settings.CustomLaunchers.FirstOrDefault(x=>x.Id==id) is not { IconPath: null } definition) return;
-            using var stream=await core.GetFaviconAsync(Microsoft.Web.WebView2.Core.CoreWebView2FaviconImageFormat.Png);
-            if(stream is null) return; using var buffer=new MemoryStream(); await stream.CopyToAsync(buffer); var bytes=buffer.ToArray();
-            if(bytes.Length is 0 or > 1_000_000 || !Decodes(bytes) || definition.IconPath is not null || !_settings.CustomLaunchers.Contains(definition)) return;
-            var dir=Path.Combine(_root,"customsitefiles"); Directory.CreateDirectory(dir); var path=id+".png"; await File.WriteAllBytesAsync(Path.Combine(dir,path),bytes);
-            definition.IconPath=path; RebuildLauncherButtons(); await SaveAsync();
+            if(_settings.CustomLaunchers.FirstOrDefault(x=>x.Id==id) is not { } definition || IconIsChosen(definition)) return;
+            const string script="(function(){var r=[];var add=function(u,s,k){r.push([u,s||'',k||''])};document.querySelectorAll('link[rel*=icon]').forEach(function(l){if(!/mask/i.test(l.rel)&&!/svg/i.test(l.type||'')) add(l.href,l.sizes&&l.sizes.value,/apple/i.test(l.rel)?'apple':'')});var m=document.querySelector('link[rel=manifest]');if(m){try{var x=new XMLHttpRequest();x.open('GET',m.href,false);x.send();var j=JSON.parse(x.responseText);(j.icons||[]).forEach(function(i){if(!/monochrome/i.test(i.purpose||'')) add(new URL(i.src,m.href).href,i.sizes,'manifest')})}catch(e){}}return JSON.stringify(r)})()";
+            var raw=await core.ExecuteScriptAsync(script);
+            var list=new List<(int Size,int Rank,Uri Uri)>();
+            if(System.Text.Json.JsonSerializer.Deserialize<string>(raw) is { } json)
+                foreach(var item in System.Text.Json.JsonSerializer.Deserialize<string[][]>(json) ?? [])
+                    if(Uri.TryCreate(item[0],UriKind.Absolute,out var uri) && uri.Scheme==Uri.UriSchemeHttps && !uri.AbsolutePath.EndsWith(".svg",StringComparison.OrdinalIgnoreCase))
+                        list.Add((item[1].Split(' ',StringSplitOptions.RemoveEmptyEntries).Select(t=>int.TryParse(t.Split('x','X')[0],out var n)?n:0).DefaultIfEmpty(0).Max(),item[2]=="apple"?0:1,uri));
+            byte[]? best=null; var bestWidth=0; string? bestExt=null;
+            using(var client=new HttpClient { Timeout=TimeSpan.FromSeconds(10) })
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36");
+                foreach(var candidate in list.OrderByDescending(x=>x.Size).ThenBy(x=>x.Rank).Select(x=>x.Uri).Distinct().Take(4)) {
+                    byte[]? bytes; try { bytes=await ReadLimitedAsync(client,candidate,1_000_000,false,CancellationToken.None); } catch { continue; }
+                    if(bytes is null || ImageExtension(bytes) is not { } ext) continue;
+                    var width=PixelWidth(bytes); if(width>bestWidth) { best=bytes; bestWidth=width; bestExt=ext; }
+                }
+            }
+            if(best is null)
+            {
+                if(definition.IconPath is not null) return;
+                using var stream=await core.GetFaviconAsync(Microsoft.Web.WebView2.Core.CoreWebView2FaviconImageFormat.Png);
+                if(stream is null) return; using var buffer=new MemoryStream(); await stream.CopyToAsync(buffer); best=buffer.ToArray(); bestExt=".png"; bestWidth=PixelWidth(best);
+            }
+            if(best.Length is 0 or > 1_000_000 || bestWidth<=0 || !_settings.CustomLaunchers.Contains(definition) || IconIsChosen(definition)) return;
+            if(definition.IconPath is { } current) { try { if(bestWidth<=PixelWidth(File.ReadAllBytes(Path.Combine(_root,"customsitefiles",Path.GetFileName(current))))) return; } catch { } }
+            StoreIcon(definition,best,bestExt!,false);
         } catch { }
     }
     internal object? CaptureDock(string path) => CaptureElement(_dock,path);
