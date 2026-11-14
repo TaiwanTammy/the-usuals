@@ -225,7 +225,7 @@ public sealed class DesktopDockService : IDisposable
     {
         var foreground = NativeMethods.GetForegroundWindow();
         var next = false;
-        if (foreground != 0 && !ForegroundWindowHelper.IsOwnedByCurrentProcess(foreground) && NativeMethods.GetWindowRect(foreground, out var rect))
+        if (foreground != 0 && !ForegroundWindowHelper.IsOwnedByCurrentProcess(foreground) && !IsDesktopOrTaskbar(foreground) && NativeMethods.GetWindowRect(foreground, out var rect))
         {
             var mon = NativeMethods.MonitorFromWindow(foreground, NativeMethods.MonitorDefaultToNearest);
             var mi = GetMonitorInfo(mon);
@@ -233,6 +233,17 @@ public sealed class DesktopDockService : IDisposable
         }
         SetFullscreenState(next);
     }
+
+    // The desktop itself covers the whole screen, so clicking it must not count as a full screen app.
+    private static bool IsDesktopOrTaskbar(nint hwnd)
+    {
+        var name = new System.Text.StringBuilder(64);
+        NativeMethods.GetClassName(hwnd, name, name.Capacity);
+        return name.ToString() is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
+    }
+
+    // Checked several times a second, because Windows' own full screen notice misses browser and video full screen.
+    public void CheckFullscreen() => UpdateFullscreenState();
 
     private void SetFullscreenState(bool fullscreen)
     {

@@ -74,7 +74,8 @@ public sealed class App : System.Windows.Application
         {
             _instanceMutex.Dispose();
             _instanceMutex = null;
-            if (!launch.QuietSecondInstance)
+            // Opening it again while it runs (say, two startup entries at sign-in) is simply ignored.
+            if (!launch.QuietSecondInstance && (isolated || fixture))
                 System.Windows.MessageBox.Show(
                     "The sidebar is already running. Quit the current copy using its tray menu, then open this version.",
                     "Sidebar",
@@ -92,6 +93,14 @@ public sealed class App : System.Windows.Application
             _instanceMutex?.Dispose();
             _instanceMutex = null;
         };
+#if !TEST_HARNESS
+        if (!isolated && !fixture && LocalUpdate.Waiting(root))
+        {
+            LocalUpdate.RestartAfterExit(root, true);
+            Shutdown(0);
+            return;
+        }
+#endif
         var settings = AppSettings.SafeLoad(Path.Combine(root, "settings.json"));
         try
         {

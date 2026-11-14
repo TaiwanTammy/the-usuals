@@ -126,6 +126,8 @@ internal sealed partial class HostWindow : Window
 #endif
         _focusWatch.Tick += (_, _) =>
         {
+            if (!_options.Fixture)
+                FollowFullscreen();
             if (
                 _options.Smoke
                 || _panel.HasActiveAuth
@@ -188,6 +190,25 @@ internal sealed partial class HostWindow : Window
                     DispatcherPriority.ApplicationIdle
                 );
             };
+    }
+
+    // A full screen window (a video, a game, a browser after F11) covers everything, sidebar included; when it ends the sidebar is back on top.
+    private bool _behindFullscreen;
+
+    private void FollowFullscreen()
+    {
+        _shell.CheckFullscreen();
+        var behind = _shell.IsFullscreenActive;
+        if (behind == _behindFullscreen)
+            return;
+        _behindFullscreen = behind;
+        var topmost = !behind && _settings.Topmost;
+        Topmost = topmost;
+        _panel.Topmost = topmost;
+        if (behind)
+            foreach (var window in new Window[] { this, _panel })
+                if (new System.Windows.Interop.WindowInteropHelper(window).Handle is var hwnd && hwnd != 0)
+                    NativeMethods.SetWindowPos(hwnd, 1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
     }
 
     private bool _quitting;

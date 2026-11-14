@@ -78,6 +78,7 @@ internal sealed partial class HostWindow
         list.Children.Add(_brandingHeader);
         list.Children.Add(FlyoutRow("Keyboard shortcut", ShortcutText(), () => { _settingsFlyout!.IsOpen = false; ConfigureShortcut(); }));
         list.Children.Add(FlyoutDivider());
+        list.Children.Add(FlyoutRow(LocalUpdate.Waiting(_root) ? "Restart to update" : "Restart", null, () => { _settingsFlyout!.IsOpen = false; LocalUpdate.RestartAfterExit(_root, true); Quit(); }));
         list.Children.Add(FlyoutRow("Hide sidebar", null, () => { _settingsFlyout!.IsOpen = false; HideUtility(); }));
         list.Children.Add(FlyoutRow("Quit", null, () => { _settingsFlyout!.IsOpen = false; Quit(); }));
         SetFlyoutContent(_settingsFlyout!, list);
